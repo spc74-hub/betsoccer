@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'login' | 'register' | 'magic'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'magic' | 'reset'>('login');
   const router = useRouter();
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -81,6 +81,27 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    setError('');
+
+    const supabase = createClient();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/api/auth/callback?next=/reset-password`,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setMessage('Revisa tu email para restablecer tu contraseña');
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -129,7 +150,7 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <form onSubmit={mode === 'magic' ? handleMagicLink : handlePasswordLogin} className="space-y-4">
+          <form onSubmit={mode === 'magic' ? handleMagicLink : mode === 'reset' ? handleResetPassword : handlePasswordLogin} className="space-y-4">
             <div>
               <label
                 htmlFor="email"
@@ -148,7 +169,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {mode !== 'magic' && (
+            {(mode === 'login' || mode === 'register') && (
               <div>
                 <label
                   htmlFor="password"
@@ -177,10 +198,10 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  {mode === 'magic' ? 'Enviando...' : mode === 'register' ? 'Registrando...' : 'Entrando...'}
+                  {mode === 'magic' || mode === 'reset' ? 'Enviando...' : mode === 'register' ? 'Registrando...' : 'Entrando...'}
                 </>
               ) : (
-                mode === 'magic' ? 'Enviar enlace mágico' : mode === 'register' ? 'Crear cuenta' : 'Entrar'
+                mode === 'magic' ? 'Enviar enlace mágico' : mode === 'reset' ? 'Enviar email de recuperación' : mode === 'register' ? 'Crear cuenta' : 'Entrar'
               )}
             </button>
           </form>
@@ -191,6 +212,26 @@ export default function LoginPage() {
 
           {error && (
             <p className="mt-4 text-center text-red-400 text-sm">{error}</p>
+          )}
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => setMode('reset')}
+              className="mt-4 w-full text-center text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
+
+          {mode === 'reset' && (
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="mt-4 w-full text-center text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              ← Volver a iniciar sesión
+            </button>
           )}
         </div>
 

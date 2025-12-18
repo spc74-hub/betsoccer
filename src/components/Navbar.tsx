@@ -11,13 +11,15 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
+  { href: '/jornada', label: 'Jornada', icon: Users },
   { href: '/matches', label: 'Partidos', icon: Calendar },
-  { href: '/standings', label: 'Clasificación', icon: Trophy },
+  { href: '/standings', label: 'Clasificacion', icon: Trophy },
   { href: '/history', label: 'Historial', icon: History },
 ];
 

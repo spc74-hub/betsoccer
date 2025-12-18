@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Match, Prediction, User } from '@/types';
 import { formatMatchDate, formatMatchTime, isPredictionLocked, cn } from '@/lib/utils';
-import { Loader2, Clock, Lock, Check, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Clock, Lock, Check } from 'lucide-react';
 
 interface MatchWithAllPredictions extends Match {
   predictions: Record<string, Prediction>;
@@ -14,7 +14,6 @@ export default function JornadaPage() {
   const [matches, setMatches] = useState<MatchWithAllPredictions[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showHidden, setShowHidden] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -79,25 +78,11 @@ export default function JornadaPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Proxima Jornada</h1>
-          <p className="text-gray-400 mt-1">
-            Comparativa de pronosticos de todos los jugadores
-          </p>
-        </div>
-        <button
-          onClick={() => setShowHidden(!showHidden)}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-            showHidden
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-          )}
-        >
-          {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          {showHidden ? 'Mostrando ocultos' : 'Mostrar antes de tiempo'}
-        </button>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold">Proxima Jornada</h1>
+        <p className="text-gray-400 mt-1">
+          Comparativa de pronosticos de todos los jugadores
+        </p>
       </div>
 
       {matches.length === 0 ? (
@@ -108,7 +93,6 @@ export default function JornadaPage() {
         <div className="space-y-6">
           {matches.map((match) => {
             const isLocked = isPredictionLocked(match.kickoff_utc);
-            const canShowPredictions = isLocked || showHidden;
 
             return (
               <div
@@ -200,19 +184,12 @@ export default function JornadaPage() {
                           </span>
                           <div className="flex items-center gap-2">
                             {hasPrediction ? (
-                              canShowPredictions ? (
-                                <span className="flex items-center gap-2">
-                                  <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm">
-                                    {prediction.home_score} - {prediction.away_score}
-                                  </span>
-                                  <Check className="w-4 h-4 text-green-400" />
+                              <span className="flex items-center gap-2">
+                                <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm">
+                                  {prediction.home_score} - {prediction.away_score}
                                 </span>
-                              ) : (
-                                <span className="flex items-center gap-2 text-green-400 text-sm">
-                                  <Check className="w-4 h-4" />
-                                  Listo
-                                </span>
-                              )
+                                <Check className="w-4 h-4 text-green-400" />
+                              </span>
                             ) : (
                               <span className="text-yellow-400 text-sm flex items-center gap-1">
                                 <Clock className="w-4 h-4" />
@@ -225,13 +202,6 @@ export default function JornadaPage() {
                     })}
                   </div>
                 </div>
-
-                {/* Hidden predictions warning */}
-                {!isLocked && !showHidden && (
-                  <p className="text-xs text-gray-500 mt-3 text-center">
-                    Los pronosticos se mostraran cuando empiece el partido
-                  </p>
-                )}
               </div>
             );
           })}

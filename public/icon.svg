@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#f97316"/>
+  <g transform="translate(256,256)">
+    <circle r="160" fill="white"/>
+    <path d="M0,-160 L47,-76 L152,-49 L95,38 L118,152 L0,105 L-118,152 L-95,38 L-152,-49 L-47,-76 Z" fill="none" stroke="#1f2937" stroke-width="12"/>
+    <polygon points="0,-80 -76,-25 -47,65 47,65 76,-25" fill="#1f2937"/>
+    <line x1="0" y1="-80" x2="0" y2="-160" stroke="#1f2937" stroke-width="12"/>
+    <line x1="-76" y1="-25" x2="-152" y2="-49" stroke="#1f2937" stroke-width="12"/>
+    <line x1="76" y1="-25" x2="152" y2="-49" stroke="#1f2937" stroke-width="12"/>
+    <line x1="-47" y1="65" x2="-118" y2="152" stroke="#1f2937" stroke-width="12"/>
+    <line x1="47" y1="65" x2="118" y2="152" stroke="#1f2937" stroke-width="12"/>
+  </g>
+</svg>

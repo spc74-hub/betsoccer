@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { Match, Prediction } from '@/types';
 import {
   formatMatchDate,
@@ -89,12 +88,10 @@ export function MatchCard({
       <div className="flex items-center justify-between text-sm mb-3">
         <div className="flex items-center gap-2">
           {match.competition_logo && (
-            <Image
+            <img
               src={match.competition_logo}
               alt={match.competition}
-              width={20}
-              height={20}
-              className="rounded"
+              className="w-5 h-5 rounded object-contain"
             />
           )}
           <span className="text-gray-400">{match.competition}</span>
@@ -132,12 +129,10 @@ export function MatchCard({
         <div className="flex-1 text-center min-w-0">
           <div className="w-12 h-12 mx-auto mb-2 flex items-center justify-center">
             {match.home_team_logo && (
-              <Image
+              <img
                 src={match.home_team_logo}
                 alt={match.home_team}
-                width={48}
-                height={48}
-                className="object-contain max-w-full max-h-full"
+                className="w-12 h-12 object-contain"
               />
             )}
           </div>
@@ -244,12 +239,10 @@ export function MatchCard({
         <div className="flex-1 text-center min-w-0">
           <div className="w-12 h-12 mx-auto mb-2 flex items-center justify-center">
             {match.away_team_logo && (
-              <Image
+              <img
                 src={match.away_team_logo}
                 alt={match.away_team}
-                width={48}
-                height={48}
-                className="object-contain max-w-full max-h-full"
+                className="w-12 h-12 object-contain"
               />
             )}
           </div>

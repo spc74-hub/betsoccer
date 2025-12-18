@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Match, Prediction } from '@/types';
 import {
   formatMatchDate,
@@ -31,6 +31,13 @@ export function MatchCard({
   const [awayScore, setAwayScore] = useState(prediction?.away_score ?? 0);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync state when prediction prop changes (e.g., when switching users)
+  useEffect(() => {
+    setHomeScore(prediction?.home_score ?? 0);
+    setAwayScore(prediction?.away_score ?? 0);
+    setHasChanges(false);
+  }, [prediction]);
 
   const isLocked = isPredictionLocked(match.kickoff_utc);
   const isFinished = match.status === 'FINISHED';

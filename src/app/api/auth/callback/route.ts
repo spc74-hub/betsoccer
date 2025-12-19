@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type');
-  const next = searchParams.get('next') ?? '/matches';
+  const next = searchParams.get('next') ?? '/jornada';
 
   // Use production URL always
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://betsoccer.up.railway.app';

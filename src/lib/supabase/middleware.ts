@@ -35,6 +35,7 @@ export async function updateSession(request: NextRequest) {
 
   // Protected routes
   const isProtectedRoute =
+    request.nextUrl.pathname.startsWith('/jornada') ||
     request.nextUrl.pathname.startsWith('/matches') ||
     request.nextUrl.pathname.startsWith('/predictions') ||
     request.nextUrl.pathname.startsWith('/standings') ||
@@ -46,17 +47,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from login to matches
+  // Redirect authenticated users from login to jornada
   if (user && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = '/matches';
+    url.pathname = '/jornada';
     return NextResponse.redirect(url);
   }
 
-  // Redirect root to matches if authenticated, login if not
+  // Redirect root to jornada if authenticated, login if not
   if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone();
-    url.pathname = user ? '/matches' : '/login';
+    url.pathname = user ? '/jornada' : '/login';
     return NextResponse.redirect(url);
   }
 

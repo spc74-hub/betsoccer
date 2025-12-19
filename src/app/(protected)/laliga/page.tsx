@@ -67,8 +67,8 @@ export default function LaLigaPage() {
     fetchData();
   }, [viewMode]);
 
-  // Group matches by matchday and sort
-  const groupedMatches = useMemo(() => {
+  // Separate and group matches into upcoming and played
+  const { upcomingMatches, playedMatches } = useMemo(() => {
     const now = new Date();
 
     // Filter matches
@@ -85,7 +85,6 @@ export default function LaLigaPage() {
 
     if (showFavoritesOnly && favorites.length > 0) {
       filtered = filtered.filter((m) => {
-        // We need team IDs, but we only have names. Let's match by checking standings
         const homeTeam = standings.find(s => s.team.name === m.home_team);
         const awayTeam = standings.find(s => s.team.name === m.away_team);
         return (homeTeam && favorites.includes(homeTeam.team.id)) ||
@@ -93,41 +92,52 @@ export default function LaLigaPage() {
       });
     }
 
-    // Group by date
-    const groups: Record<string, Partial<Match>[]> = {};
-    filtered.forEach((match) => {
-      if (match.kickoff_utc) {
-        const date = new Date(match.kickoff_utc).toLocaleDateString('es-ES', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        });
-        if (!groups[date]) groups[date] = [];
-        groups[date].push(match);
-      }
-    });
+    // Separate into upcoming and played
+    const upcoming = filtered.filter(m => m.status === 'SCHEDULED' || m.status === 'LIVE');
+    const played = filtered.filter(m => m.status === 'FINISHED');
 
-    // Sort groups: closest to today first
-    const sortedEntries = Object.entries(groups).sort(([, a], [, b]) => {
+    // Group by date helper
+    const groupByDate = (matchList: Partial<Match>[]) => {
+      const groups: Record<string, Partial<Match>[]> = {};
+      matchList.forEach((match) => {
+        if (match.kickoff_utc) {
+          const date = new Date(match.kickoff_utc).toLocaleDateString('es-ES', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          });
+          if (!groups[date]) groups[date] = [];
+          groups[date].push(match);
+        }
+      });
+      return groups;
+    };
+
+    // Group upcoming (sorted ascending - nearest first)
+    const upcomingGroups = groupByDate(upcoming);
+    const sortedUpcoming = Object.entries(upcomingGroups).sort(([, a], [, b]) => {
       const dateA = new Date(a[0]?.kickoff_utc || '');
       const dateB = new Date(b[0]?.kickoff_utc || '');
-
-      // Calculate distance from now
-      const distA = Math.abs(dateA.getTime() - now.getTime());
-      const distB = Math.abs(dateB.getTime() - now.getTime());
-
-      return distA - distB;
+      return dateA.getTime() - dateB.getTime();
     });
 
-    return sortedEntries;
+    // Group played (sorted descending - most recent first)
+    const playedGroups = groupByDate(played);
+    const sortedPlayed = Object.entries(playedGroups).sort(([, a], [, b]) => {
+      const dateA = new Date(a[0]?.kickoff_utc || '');
+      const dateB = new Date(b[0]?.kickoff_utc || '');
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    return { upcomingMatches: sortedUpcoming, playedMatches: sortedPlayed };
   }, [matches, searchQuery, showFavoritesOnly, favorites, standings]);
 
-  // Find current matchday (closest to today)
+  // Auto-expand first upcoming matchday
   useEffect(() => {
-    if (groupedMatches.length > 0 && !expandedMatchday) {
-      setExpandedMatchday(groupedMatches[0][0]);
+    if (upcomingMatches.length > 0 && !expandedMatchday) {
+      setExpandedMatchday(upcomingMatches[0][0]);
     }
-  }, [groupedMatches, expandedMatchday]);
+  }, [upcomingMatches, expandedMatchday]);
 
   // Filter standings
   const filteredStandings = useMemo(() => {
@@ -227,86 +237,136 @@ export default function LaLigaPage() {
 
       {/* Matches view */}
       {!loading && viewMode === 'matches' && (
-        <div className="space-y-4">
-          {groupedMatches.length === 0 ? (
-            <p className="text-center text-gray-400 py-12">No se encontraron partidos</p>
-          ) : (
-            groupedMatches.map(([date, dayMatches]) => (
-              <div key={date} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
-                <button
-                  onClick={() => setExpandedMatchday(expandedMatchday === date ? null : date)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors"
-                >
-                  <span className="font-medium capitalize">{date}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-400">{dayMatches.length} partidos</span>
-                    {expandedMatchday === date ? (
-                      <ChevronUp className="w-5 h-5 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
+        <div className="space-y-8">
+          {/* Upcoming matches section */}
+          {upcomingMatches.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Proximos partidos
+              </h2>
+              <div className="space-y-3">
+                {upcomingMatches.map(([date, dayMatches]) => (
+                  <div key={date} className="bg-gray-800 rounded-xl overflow-hidden border border-green-500/30">
+                    <button
+                      onClick={() => setExpandedMatchday(expandedMatchday === date ? null : date)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors"
+                    >
+                      <span className="font-medium capitalize text-green-400">{date}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-400">{dayMatches.length} partidos</span>
+                        {expandedMatchday === date ? (
+                          <ChevronUp className="w-5 h-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        )}
+                      </div>
+                    </button>
+
+                    {expandedMatchday === date && (
+                      <div className="border-t border-gray-700 divide-y divide-gray-700">
+                        {dayMatches.map((match) => {
+                          const isLive = match.status === 'LIVE';
+
+                          return (
+                            <div key={match.external_id} className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  {match.home_team_logo && (
+                                    <img src={match.home_team_logo} alt={match.home_team} className="w-6 h-6 object-contain" />
+                                  )}
+                                  <span className="text-sm truncate">{match.home_team}</span>
+                                </div>
+                                <div className="px-4 text-center min-w-[80px]">
+                                  {isLive ? (
+                                    <>
+                                      <span className="font-bold text-green-400">{match.home_score} - {match.away_score}</span>
+                                      <span className="block text-xs text-green-400">EN VIVO</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-sm text-green-400 font-medium">
+                                      {formatMatchTime(match.kickoff_utc!)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-1 justify-end">
+                                  <span className="text-sm truncate text-right">{match.away_team}</span>
+                                  {match.away_team_logo && (
+                                    <img src={match.away_team_logo} alt={match.away_team} className="w-6 h-6 object-contain" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-                {expandedMatchday === date && (
-                  <div className="border-t border-gray-700 divide-y divide-gray-700">
-                    {dayMatches.map((match) => {
-                      const isFinished = match.status === 'FINISHED';
-                      const isLive = match.status === 'LIVE';
+          {/* Played matches section */}
+          {playedMatches.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
+                <Trophy className="w-5 h-5" />
+                Partidos jugados
+              </h2>
+              <div className="space-y-3">
+                {playedMatches.map(([date, dayMatches]) => (
+                  <div key={date} className="bg-gray-800/60 rounded-xl overflow-hidden border border-gray-700">
+                    <button
+                      onClick={() => setExpandedMatchday(expandedMatchday === date ? null : date)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors"
+                    >
+                      <span className="font-medium capitalize text-gray-400">{date}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">{dayMatches.length} partidos</span>
+                        {expandedMatchday === date ? (
+                          <ChevronUp className="w-5 h-5 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-gray-500" />
+                        )}
+                      </div>
+                    </button>
 
-                      return (
-                        <div key={match.external_id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            {/* Home team */}
-                            <div className="flex items-center gap-2 flex-1">
-                              {match.home_team_logo && (
-                                <img
-                                  src={match.home_team_logo}
-                                  alt={match.home_team}
-                                  className="w-6 h-6 object-contain"
-                                />
-                              )}
-                              <span className="text-sm truncate">{match.home_team}</span>
-                            </div>
-
-                            {/* Score or time */}
-                            <div className="px-4 text-center min-w-[80px]">
-                              {isFinished || isLive ? (
-                                <span className={cn(
-                                  'font-bold',
-                                  isLive && 'text-green-400'
-                                )}>
+                    {expandedMatchday === date && (
+                      <div className="border-t border-gray-700 divide-y divide-gray-700">
+                        {dayMatches.map((match) => (
+                          <div key={match.external_id} className="p-4 opacity-80">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 flex-1">
+                                {match.home_team_logo && (
+                                  <img src={match.home_team_logo} alt={match.home_team} className="w-6 h-6 object-contain" />
+                                )}
+                                <span className="text-sm truncate">{match.home_team}</span>
+                              </div>
+                              <div className="px-4 text-center min-w-[80px]">
+                                <span className="font-bold text-gray-300">
                                   {match.home_score} - {match.away_score}
                                 </span>
-                              ) : (
-                                <span className="text-sm text-gray-400">
-                                  {formatMatchTime(match.kickoff_utc!)}
-                                </span>
-                              )}
-                              {isLive && (
-                                <span className="block text-xs text-green-400">EN VIVO</span>
-                              )}
-                            </div>
-
-                            {/* Away team */}
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                              <span className="text-sm truncate text-right">{match.away_team}</span>
-                              {match.away_team_logo && (
-                                <img
-                                  src={match.away_team_logo}
-                                  alt={match.away_team}
-                                  className="w-6 h-6 object-contain"
-                                />
-                              )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-1 justify-end">
+                                <span className="text-sm truncate text-right">{match.away_team}</span>
+                                {match.away_team_logo && (
+                                  <img src={match.away_team_logo} alt={match.away_team} className="w-6 h-6 object-contain" />
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))
+            </div>
+          )}
+
+          {upcomingMatches.length === 0 && playedMatches.length === 0 && (
+            <p className="text-center text-gray-400 py-12">No se encontraron partidos</p>
           )}
         </div>
       )}

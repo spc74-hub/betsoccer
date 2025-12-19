@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith('/jornada') ||
     request.nextUrl.pathname.startsWith('/matches') ||
+    request.nextUrl.pathname.startsWith('/laliga') ||
     request.nextUrl.pathname.startsWith('/predictions') ||
     request.nextUrl.pathname.startsWith('/standings') ||
     request.nextUrl.pathname.startsWith('/history');

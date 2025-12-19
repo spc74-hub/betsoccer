@@ -8,6 +8,12 @@ const TEAM_IDS = {
   BARCELONA: 81,
 };
 
+// Competition IDs
+const COMPETITION_IDS = {
+  LA_LIGA: 'PD',      // Primera División
+  SEGUNDA: 'SD',      // Segunda División
+};
+
 // Map football-data.org status to our status
 function mapStatus(apiStatus: string): MatchStatus {
   const statusMap: Record<string, MatchStatus> = {
@@ -161,4 +167,103 @@ export async function fetchMatchById(matchId: number): Promise<Partial<Match> | 
   };
 }
 
-export { TEAM_IDS };
+// Fetch all matches for a competition
+export async function fetchCompetitionMatches(competitionId: string): Promise<Partial<Match>[]> {
+  const apiKey = process.env.FOOTBALL_DATA_KEY;
+  if (!apiKey) {
+    throw new Error('FOOTBALL_DATA_KEY not configured');
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/competitions/${competitionId}/matches`,
+    {
+      headers: {
+        'X-Auth-Token': apiKey,
+      },
+      next: { revalidate: 3600 },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`football-data.org error: ${response.status} - ${error}`);
+  }
+
+  const data: FootballDataResponse = await response.json();
+
+  return data.matches.map((match) => {
+    const seasonYear = new Date(match.season.startDate).getFullYear();
+    return {
+      external_id: match.id,
+      competition: match.competition.name,
+      competition_logo: match.competition.emblem,
+      season: `${seasonYear}/${seasonYear + 1}`,
+      home_team: match.homeTeam.name,
+      home_team_logo: match.homeTeam.crest,
+      away_team: match.awayTeam.name,
+      away_team_logo: match.awayTeam.crest,
+      kickoff_utc: match.utcDate,
+      venue: match.venue || undefined,
+      status: mapStatus(match.status),
+      home_score: match.score.fullTime.home ?? undefined,
+      away_score: match.score.fullTime.away ?? undefined,
+    };
+  });
+}
+
+// Standings types
+export interface TeamStanding {
+  position: number;
+  team: {
+    id: number;
+    name: string;
+    shortName: string;
+    crest: string;
+  };
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+}
+
+interface StandingsResponse {
+  standings: {
+    type: string;
+    table: TeamStanding[];
+  }[];
+}
+
+// Fetch standings for a competition
+export async function fetchCompetitionStandings(competitionId: string): Promise<TeamStanding[]> {
+  const apiKey = process.env.FOOTBALL_DATA_KEY;
+  if (!apiKey) {
+    throw new Error('FOOTBALL_DATA_KEY not configured');
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/competitions/${competitionId}/standings`,
+    {
+      headers: {
+        'X-Auth-Token': apiKey,
+      },
+      next: { revalidate: 3600 },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`football-data.org error: ${response.status} - ${error}`);
+  }
+
+  const data: StandingsResponse = await response.json();
+
+  // Return TOTAL standings (not HOME or AWAY)
+  const totalStandings = data.standings.find(s => s.type === 'TOTAL');
+  return totalStandings?.table || [];
+}
+
+export { TEAM_IDS, COMPETITION_IDS };

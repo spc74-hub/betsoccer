@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Users,
+  Tv,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { href: '/jornada', label: 'Jornada', icon: Users },
   { href: '/matches', label: 'Partidos', icon: Calendar },
+  { href: '/laliga', label: 'LaLiga', icon: Tv },
   { href: '/standings', label: 'Clasificacion', icon: Trophy },
   { href: '/history', label: 'Historial', icon: History },
 ];

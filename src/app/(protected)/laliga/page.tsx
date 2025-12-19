@@ -14,11 +14,9 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
-type Division = 'primera' | 'segunda';
 type ViewMode = 'matches' | 'standings';
 
 export default function LaLigaPage() {
-  const [division, setDivision] = useState<Division>('primera');
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [matches, setMatches] = useState<Partial<Match>[]>([]);
   const [standings, setStandings] = useState<TeamStanding[]>([]);
@@ -53,11 +51,11 @@ export default function LaLigaPage() {
       setLoading(true);
       try {
         if (viewMode === 'matches') {
-          const res = await fetch(`/api/laliga?division=${division}&type=matches`);
+          const res = await fetch(`/api/laliga?type=matches`);
           const data = await res.json();
           setMatches(data.matches || []);
         } else {
-          const res = await fetch(`/api/laliga?division=${division}&type=standings`);
+          const res = await fetch(`/api/laliga?type=standings`);
           const data = await res.json();
           setStandings(data.standings || []);
         }
@@ -67,7 +65,7 @@ export default function LaLigaPage() {
       setLoading(false);
     }
     fetchData();
-  }, [division, viewMode]);
+  }, [viewMode]);
 
   // Group matches by matchday and sort
   const groupedMatches = useMemo(() => {
@@ -162,34 +160,8 @@ export default function LaLigaPage() {
 
       {/* Controls */}
       <div className="flex flex-col gap-4 mb-6">
-        {/* Division & View toggles */}
+        {/* View toggles */}
         <div className="flex flex-wrap gap-3">
-          {/* Division selector */}
-          <div className="flex bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setDivision('primera')}
-              className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                division === 'primera'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              )}
-            >
-              Primera
-            </button>
-            <button
-              onClick={() => setDivision('segunda')}
-              className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                division === 'segunda'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              )}
-            >
-              Segunda
-            </button>
-          </div>
-
           {/* View mode selector */}
           <div className="flex bg-gray-800 rounded-lg p-1">
             <button

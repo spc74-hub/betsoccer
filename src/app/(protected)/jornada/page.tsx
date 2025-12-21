@@ -4,16 +4,42 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Match, Prediction, User } from '@/types';
 import { formatMatchDate, formatMatchTime, isPredictionLocked, cn } from '@/lib/utils';
-import { Loader2, Clock, Lock, Check } from 'lucide-react';
+import { Loader2, Clock, Lock, Check, RefreshCw, X, Trophy } from 'lucide-react';
 
 interface MatchWithAllPredictions extends Match {
   predictions: Record<string, Prediction>;
 }
 
 export default function JornadaPage() {
-  const [matches, setMatches] = useState<MatchWithAllPredictions[]>([]);
+  const [upcomingMatches, setUpcomingMatches] = useState<MatchWithAllPredictions[]>([]);
+  const [finishedMatches, setFinishedMatches] = useState<MatchWithAllPredictions[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const response = await fetch('/api/sync', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok) {
+        setSyncResult({
+          success: true,
+          message: `Sincronizado: ${data.stats.updated} actualizados, ${data.stats.created} nuevos`,
+        });
+        // Refresh the page data
+        window.location.reload();
+      } else {
+        setSyncResult({ success: false, message: data.error || 'Error al sincronizar' });
+      }
+    } catch {
+      setSyncResult({ success: false, message: 'Error de conexion' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -29,37 +55,60 @@ export default function JornadaPage() {
         setUsers(usersData);
       }
 
-      // Fetch upcoming matches (next 2 for each team)
-      const { data: matchesData } = await supabase
+      // Fetch upcoming matches
+      const { data: upcomingData } = await supabase
         .from('matches')
         .select('*')
         .in('status', ['SCHEDULED', 'LIVE'])
         .order('kickoff_utc', { ascending: true })
         .limit(10);
 
-      if (matchesData && matchesData.length > 0) {
+      // Fetch recently finished matches (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const { data: finishedData } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('status', 'FINISHED')
+        .gte('kickoff_utc', sevenDaysAgo.toISOString())
+        .order('kickoff_utc', { ascending: false })
+        .limit(10);
+
+      const allMatches = [...(upcomingData || []), ...(finishedData || [])];
+
+      if (allMatches.length > 0) {
         // Fetch all predictions for these matches
-        const matchIds = matchesData.map((m) => m.id);
+        const matchIds = allMatches.map((m) => m.id);
         const { data: predictionsData } = await supabase
           .from('predictions')
           .select('*')
           .in('match_id', matchIds);
 
-        // Group predictions by match
-        const matchesWithPredictions: MatchWithAllPredictions[] = matchesData.map((match) => {
+        // Process upcoming matches
+        const upcoming: MatchWithAllPredictions[] = (upcomingData || []).map((match) => {
           const matchPredictions: Record<string, Prediction> = {};
           predictionsData?.forEach((p) => {
             if (p.match_id === match.id) {
               matchPredictions[p.user_id] = p;
             }
           });
-          return {
-            ...match,
-            predictions: matchPredictions,
-          };
+          return { ...match, predictions: matchPredictions };
         });
 
-        setMatches(matchesWithPredictions);
+        // Process finished matches
+        const finished: MatchWithAllPredictions[] = (finishedData || []).map((match) => {
+          const matchPredictions: Record<string, Prediction> = {};
+          predictionsData?.forEach((p) => {
+            if (p.match_id === match.id) {
+              matchPredictions[p.user_id] = p;
+            }
+          });
+          return { ...match, predictions: matchPredictions };
+        });
+
+        setUpcomingMatches(upcoming);
+        setFinishedMatches(finished);
       }
 
       setLoading(false);
@@ -76,33 +125,192 @@ export default function JornadaPage() {
     );
   }
 
+  // Helper to check if prediction was correct
+  const isPredictionCorrect = (prediction: Prediction, match: Match): boolean => {
+    return prediction.home_score === match.home_score && prediction.away_score === match.away_score;
+  };
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Proxima Jornada</h1>
-        <p className="text-gray-400 mt-1">
-          Comparativa de pronosticos de todos los jugadores
-        </p>
+      {/* Header with sync button */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold">Jornada</h1>
+          <p className="text-gray-400 mt-1">
+            Comparativa de pronosticos de todos los jugadores
+          </p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+        >
+          <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} />
+          {syncing ? 'Sincronizando...' : 'Sincronizar'}
+        </button>
       </div>
 
-      {matches.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-400">No hay partidos proximos</p>
+      {/* Sync result message */}
+      {syncResult && (
+        <div
+          className={cn(
+            'mb-6 p-3 rounded-lg flex items-center justify-between',
+            syncResult.success ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
+          )}
+        >
+          <span>{syncResult.message}</span>
+          <button onClick={() => setSyncResult(null)}>
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {matches.map((match) => {
-            const isLocked = isPredictionLocked(match.kickoff_utc);
+      )}
 
-            return (
+      {/* Upcoming matches section */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Proximos partidos
+        </h2>
+        {upcomingMatches.length === 0 ? (
+          <div className="text-center py-8 bg-gray-800/50 rounded-xl">
+            <p className="text-gray-400">No hay partidos proximos</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {upcomingMatches.map((match) => {
+              const isLocked = isPredictionLocked(match.kickoff_utc);
+
+              return (
+                <div
+                  key={match.id}
+                  className={cn(
+                    'bg-gray-800 rounded-xl p-5 border transition-all',
+                    match.status === 'LIVE'
+                      ? 'border-green-500 shadow-lg shadow-green-500/20'
+                      : 'border-gray-700'
+                  )}
+                >
+                  {/* Match header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      {match.competition_logo && (
+                        <img
+                          src={match.competition_logo}
+                          alt={match.competition}
+                          className="w-5 h-5 rounded object-contain"
+                        />
+                      )}
+                      <span className="text-sm text-gray-400">{match.competition}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {match.status === 'LIVE' ? (
+                        <span className="flex items-center gap-1 text-green-400 font-medium">
+                          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                          EN VIVO
+                        </span>
+                      ) : isLocked ? (
+                        <span className="flex items-center gap-1 text-orange-400">
+                          <Lock className="w-3 h-3" />
+                          Bloqueado
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <Clock className="w-3 h-3" />
+                          {formatMatchTime(match.kickoff_utc)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <p className="text-xs text-gray-500 mb-4 capitalize">
+                    {formatMatchDate(match.kickoff_utc)}
+                  </p>
+
+                  {/* Teams */}
+                  <div className="flex items-center justify-center gap-4 mb-6">
+                    <div className="flex items-center gap-3 flex-1 justify-end">
+                      <span className="text-white font-medium text-right">{match.home_team}</span>
+                      {match.home_team_logo && (
+                        <img
+                          src={match.home_team_logo}
+                          alt={match.home_team}
+                          className="w-10 h-10 object-contain"
+                        />
+                      )}
+                    </div>
+                    <span className="text-2xl font-bold text-gray-500">vs</span>
+                    <div className="flex items-center gap-3 flex-1">
+                      {match.away_team_logo && (
+                        <img
+                          src={match.away_team_logo}
+                          alt={match.away_team}
+                          className="w-10 h-10 object-contain"
+                        />
+                      )}
+                      <span className="text-white font-medium">{match.away_team}</span>
+                    </div>
+                  </div>
+
+                  {/* Predictions comparison */}
+                  <div className="border-t border-gray-700 pt-4">
+                    <h3 className="text-sm font-medium text-gray-400 mb-3">Pronosticos</h3>
+                    <div className="space-y-2">
+                      {users.map((user) => {
+                        const prediction = match.predictions[user.id];
+                        const hasPrediction = !!prediction;
+
+                        return (
+                          <div
+                            key={user.id}
+                            className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg"
+                          >
+                            <span className="text-sm font-medium text-white">
+                              {user.display_name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {hasPrediction ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm">
+                                    {prediction.home_score} - {prediction.away_score}
+                                  </span>
+                                  <Check className="w-4 h-4 text-green-400" />
+                                </span>
+                              ) : (
+                                <span className="text-yellow-400 text-sm flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  Pendiente
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Finished matches section */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
+          <Trophy className="w-5 h-5" />
+          Partidos finalizados
+        </h2>
+        {finishedMatches.length === 0 ? (
+          <div className="text-center py-8 bg-gray-800/50 rounded-xl">
+            <p className="text-gray-400">No hay partidos finalizados recientes</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {finishedMatches.map((match) => (
               <div
                 key={match.id}
-                className={cn(
-                  'bg-gray-800 rounded-xl p-5 border transition-all',
-                  match.status === 'LIVE'
-                    ? 'border-green-500 shadow-lg shadow-green-500/20'
-                    : 'border-gray-700'
-                )}
+                className="bg-gray-800/70 rounded-xl p-5 border border-gray-700"
               >
                 {/* Match header */}
                 <div className="flex items-center justify-between mb-4">
@@ -116,24 +324,7 @@ export default function JornadaPage() {
                     )}
                     <span className="text-sm text-gray-400">{match.competition}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    {match.status === 'LIVE' ? (
-                      <span className="flex items-center gap-1 text-green-400 font-medium">
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        EN VIVO
-                      </span>
-                    ) : isLocked ? (
-                      <span className="flex items-center gap-1 text-orange-400">
-                        <Lock className="w-3 h-3" />
-                        Bloqueado
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-gray-400">
-                        <Clock className="w-3 h-3" />
-                        {formatMatchTime(match.kickoff_utc)}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-sm text-gray-500">Finalizado</span>
                 </div>
 
                 {/* Date */}
@@ -141,7 +332,7 @@ export default function JornadaPage() {
                   {formatMatchDate(match.kickoff_utc)}
                 </p>
 
-                {/* Teams */}
+                {/* Teams with result */}
                 <div className="flex items-center justify-center gap-4 mb-6">
                   <div className="flex items-center gap-3 flex-1 justify-end">
                     <span className="text-white font-medium text-right">{match.home_team}</span>
@@ -153,7 +344,11 @@ export default function JornadaPage() {
                       />
                     )}
                   </div>
-                  <span className="text-2xl font-bold text-gray-500">vs</span>
+                  <div className="bg-gray-700 px-4 py-2 rounded-lg">
+                    <span className="text-2xl font-bold text-white">
+                      {match.home_score} - {match.away_score}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3 flex-1">
                     {match.away_team_logo && (
                       <img
@@ -166,35 +361,56 @@ export default function JornadaPage() {
                   </div>
                 </div>
 
-                {/* Predictions comparison */}
+                {/* Predictions with results */}
                 <div className="border-t border-gray-700 pt-4">
-                  <h3 className="text-sm font-medium text-gray-400 mb-3">Pronosticos</h3>
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Resultados</h3>
                   <div className="space-y-2">
                     {users.map((user) => {
                       const prediction = match.predictions[user.id];
                       const hasPrediction = !!prediction;
+                      const isCorrect = hasPrediction && isPredictionCorrect(prediction, match);
 
                       return (
                         <div
                           key={user.id}
-                          className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg"
+                          className={cn(
+                            'flex items-center justify-between py-2 px-3 rounded-lg',
+                            isCorrect
+                              ? 'bg-green-900/30 border border-green-700'
+                              : 'bg-gray-900/50'
+                          )}
                         >
-                          <span className="text-sm font-medium text-white">
-                            {user.display_name}
-                          </span>
                           <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white">
+                              {user.display_name}
+                            </span>
+                            {isCorrect && (
+                              <span className="bg-green-600 text-xs px-2 py-0.5 rounded font-medium">
+                                +1 punto
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
                             {hasPrediction ? (
-                              <span className="flex items-center gap-2">
-                                <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm">
+                              <>
+                                <span
+                                  className={cn(
+                                    'px-3 py-1 rounded font-bold text-sm',
+                                    isCorrect
+                                      ? 'bg-green-600 text-white'
+                                      : 'bg-gray-700 text-gray-300'
+                                  )}
+                                >
                                   {prediction.home_score} - {prediction.away_score}
                                 </span>
-                                <Check className="w-4 h-4 text-green-400" />
-                              </span>
+                                {isCorrect ? (
+                                  <Check className="w-5 h-5 text-green-400" />
+                                ) : (
+                                  <X className="w-5 h-5 text-red-400" />
+                                )}
+                              </>
                             ) : (
-                              <span className="text-yellow-400 text-sm flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                Pendiente
-                              </span>
+                              <span className="text-gray-500 text-sm">Sin pronostico</span>
                             )}
                           </div>
                         </div>
@@ -203,10 +419,10 @@ export default function JornadaPage() {
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

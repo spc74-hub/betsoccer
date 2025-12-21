@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { fetchAllTrackedMatches } from '@/lib/football-api';
 import { NextResponse } from 'next/server';
 
@@ -10,7 +11,7 @@ function getServiceClient() {
   );
 }
 
-// Verify sync secret
+// Verify sync secret (for cron jobs)
 function verifySecret(request: Request): boolean {
   const authHeader = request.headers.get('authorization');
   const secret = process.env.SYNC_API_SECRET;
@@ -19,9 +20,23 @@ function verifySecret(request: Request): boolean {
   return authHeader === `Bearer ${secret}`;
 }
 
+// Verify authenticated user (for manual sync from app)
+async function verifyUser(): Promise<boolean> {
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return !!user;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
-  // Verify authorization
-  if (!verifySecret(request)) {
+  // Allow either secret (cron) or authenticated user (manual)
+  const hasSecret = verifySecret(request);
+  const hasUser = await verifyUser();
+
+  if (!hasSecret && !hasUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -2,19 +2,35 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Match, Prediction, TeamFilter as TeamFilterType } from '@/types';
+import { Match, Prediction, TeamFilter as TeamFilterType, User } from '@/types';
 import { MatchCard } from '@/components/MatchCard';
 import { TeamFilter } from '@/components/TeamFilter';
 import { Loader2, History } from 'lucide-react';
 
+interface WinnerInfo {
+  name: string;
+  score: string;
+}
+
 export default function HistoryPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
+  const [winners, setWinners] = useState<Record<string, WinnerInfo[]>>({});
   const [loading, setLoading] = useState(true);
   const [teamFilter, setTeamFilter] = useState<TeamFilterType>('all');
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
+
+    // Fetch all users first
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('*');
+
+    const usersMap: Record<string, User> = {};
+    usersData?.forEach((u) => {
+      usersMap[u.id] = u;
+    });
 
     // Fetch finished matches
     let matchQuery = supabase
@@ -43,6 +59,8 @@ export default function HistoryPage() {
 
     if (user && matchesData) {
       const matchIds = matchesData.map((m) => m.id);
+
+      // Fetch current user's predictions
       const { data: predictionsData } = await supabase
         .from('predictions')
         .select('*')
@@ -54,6 +72,27 @@ export default function HistoryPage() {
         predictionsMap[p.match_id] = p;
       });
       setPredictions(predictionsMap);
+
+      // Fetch ALL predictions with points = 1 to find winners
+      const { data: allWinningPredictions } = await supabase
+        .from('predictions')
+        .select('*')
+        .in('match_id', matchIds)
+        .eq('points', 1);
+
+      // Build winners map
+      const winnersMap: Record<string, WinnerInfo[]> = {};
+      allWinningPredictions?.forEach((p) => {
+        const userName = usersMap[p.user_id]?.display_name || 'Usuario';
+        if (!winnersMap[p.match_id]) {
+          winnersMap[p.match_id] = [];
+        }
+        winnersMap[p.match_id].push({
+          name: userName,
+          score: `${p.home_score} - ${p.away_score}`,
+        });
+      });
+      setWinners(winnersMap);
     }
 
     setMatches(matchesData || []);
@@ -129,6 +168,7 @@ export default function HistoryPage() {
               prediction={predictions[match.id]}
               onSavePrediction={async () => {}}
               showResult
+              winners={winners[match.id]}
             />
           ))}
         </div>

@@ -8,7 +8,12 @@ import {
   isPredictionLocked,
   cn,
 } from '@/lib/utils';
-import { Clock, Lock, Check, X, Loader2 } from 'lucide-react';
+import { Clock, Lock, Check, X, Loader2, Trophy } from 'lucide-react';
+
+interface WinnerInfo {
+  name: string;
+  score: string;
+}
 
 interface MatchCardProps {
   match: Match;
@@ -19,6 +24,7 @@ interface MatchCardProps {
     awayScore: number
   ) => Promise<void>;
   showResult?: boolean;
+  winners?: WinnerInfo[];
 }
 
 export function MatchCard({
@@ -26,6 +32,7 @@ export function MatchCard({
   prediction,
   onSavePrediction,
   showResult = false,
+  winners,
 }: MatchCardProps) {
   const [homeScore, setHomeScore] = useState(prediction?.home_score ?? 0);
   const [awayScore, setAwayScore] = useState(prediction?.away_score ?? 0);
@@ -283,6 +290,27 @@ export function MatchCard({
           <Check className="w-3 h-3" />
           Pronóstico guardado
         </p>
+      )}
+
+      {/* Winners section */}
+      {isFinished && winners && winners.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-700">
+          <div className="flex items-center gap-1 text-xs text-green-400 mb-2">
+            <Trophy className="w-3 h-3" />
+            <span className="font-medium">Acertaron:</span>
+          </div>
+          <div className="space-y-1">
+            {winners.map((winner, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between text-xs bg-green-500/10 rounded px-2 py-1"
+              >
+                <span className="text-green-400 font-medium">{winner.name}</span>
+                <span className="text-green-300">+1 punto</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

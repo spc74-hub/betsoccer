@@ -12,7 +12,7 @@ import { Clock, Lock, Check, X, Loader2, Trophy } from 'lucide-react';
 
 interface WinnerInfo {
   name: string;
-  score: string;
+  points: number;
 }
 
 interface MatchCardProps {
@@ -21,7 +21,9 @@ interface MatchCardProps {
   onSavePrediction: (
     matchId: string,
     homeScore: number,
-    awayScore: number
+    awayScore: number,
+    homeScoreHalftime: number,
+    awayScoreHalftime: number
   ) => Promise<void>;
   showResult?: boolean;
   winners?: WinnerInfo[];
@@ -36,13 +38,17 @@ export function MatchCard({
 }: MatchCardProps) {
   const [homeScore, setHomeScore] = useState(prediction?.home_score ?? 0);
   const [awayScore, setAwayScore] = useState(prediction?.away_score ?? 0);
+  const [homeScoreHT, setHomeScoreHT] = useState(prediction?.home_score_halftime ?? 0);
+  const [awayScoreHT, setAwayScoreHT] = useState(prediction?.away_score_halftime ?? 0);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Sync state when prediction prop changes (e.g., when switching users)
+  // Sync state when prediction prop changes
   useEffect(() => {
     setHomeScore(prediction?.home_score ?? 0);
     setAwayScore(prediction?.away_score ?? 0);
+    setHomeScoreHT(prediction?.home_score_halftime ?? 0);
+    setAwayScoreHT(prediction?.away_score_halftime ?? 0);
     setHasChanges(false);
   }, [prediction]);
 
@@ -50,26 +56,38 @@ export function MatchCard({
   const isFinished = match.status === 'FINISHED';
   const isLive = match.status === 'LIVE';
 
-  const handleScoreChange = (
-    team: 'home' | 'away',
-    delta: number
-  ) => {
+  const checkChanges = (newHomeScore: number, newAwayScore: number, newHomeHT: number, newAwayHT: number) => {
+    return (
+      newHomeScore !== (prediction?.home_score ?? 0) ||
+      newAwayScore !== (prediction?.away_score ?? 0) ||
+      newHomeHT !== (prediction?.home_score_halftime ?? 0) ||
+      newAwayHT !== (prediction?.away_score_halftime ?? 0)
+    );
+  };
+
+  const handleScoreChange = (type: 'full' | 'half', team: 'home' | 'away', delta: number) => {
     if (isLocked) return;
 
-    if (team === 'home') {
-      const newScore = Math.max(0, homeScore + delta);
-      setHomeScore(newScore);
-      setHasChanges(
-        newScore !== (prediction?.home_score ?? 0) ||
-          awayScore !== (prediction?.away_score ?? 0)
-      );
+    if (type === 'full') {
+      if (team === 'home') {
+        const newScore = Math.max(0, homeScore + delta);
+        setHomeScore(newScore);
+        setHasChanges(checkChanges(newScore, awayScore, homeScoreHT, awayScoreHT));
+      } else {
+        const newScore = Math.max(0, awayScore + delta);
+        setAwayScore(newScore);
+        setHasChanges(checkChanges(homeScore, newScore, homeScoreHT, awayScoreHT));
+      }
     } else {
-      const newScore = Math.max(0, awayScore + delta);
-      setAwayScore(newScore);
-      setHasChanges(
-        homeScore !== (prediction?.home_score ?? 0) ||
-          newScore !== (prediction?.away_score ?? 0)
-      );
+      if (team === 'home') {
+        const newScore = Math.max(0, homeScoreHT + delta);
+        setHomeScoreHT(newScore);
+        setHasChanges(checkChanges(homeScore, awayScore, newScore, awayScoreHT));
+      } else {
+        const newScore = Math.max(0, awayScoreHT + delta);
+        setAwayScoreHT(newScore);
+        setHasChanges(checkChanges(homeScore, awayScore, homeScoreHT, newScore));
+      }
     }
   };
 
@@ -77,16 +95,16 @@ export function MatchCard({
     if (isLocked || !hasChanges) return;
     setSaving(true);
     try {
-      await onSavePrediction(match.id, homeScore, awayScore);
+      await onSavePrediction(match.id, homeScore, awayScore, homeScoreHT, awayScoreHT);
       setHasChanges(false);
     } finally {
       setSaving(false);
     }
   };
 
-  const didWin =
-    isFinished &&
-    prediction?.points === 1;
+  // Calculate total points from prediction
+  const totalPoints = prediction?.points ?? 0;
+  const hasPoints = isFinished && totalPoints > 0;
 
   return (
     <div
@@ -95,7 +113,7 @@ export function MatchCard({
         isLive
           ? 'border-green-500 shadow-lg shadow-green-500/20'
           : 'border-gray-700',
-        didWin && 'border-yellow-500 shadow-lg shadow-yellow-500/20'
+        hasPoints && 'border-yellow-500 shadow-lg shadow-yellow-500/20'
       )}
     >
       {/* Competition & Time */}
@@ -156,96 +174,65 @@ export function MatchCard({
         </div>
 
         {/* Score / Prediction */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-3">
           {showResult && isFinished && (
-            <div className="text-2xl font-bold text-white mb-1">
-              {match.home_score} - {match.away_score}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {match.home_score} - {match.away_score}
+              </div>
+              {match.home_score_halftime != null && match.away_score_halftime != null && (
+                <div className="text-xs text-gray-500">
+                  (Descanso: {match.home_score_halftime} - {match.away_score_halftime})
+                </div>
+              )}
             </div>
           )}
 
-          {/* Prediction input */}
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col items-center">
-              {!isLocked && (
-                <button
-                  onClick={() => handleScoreChange('home', 1)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
-                >
-                  +
-                </button>
-              )}
-              <span
-                className={cn(
-                  'w-10 h-10 flex items-center justify-center rounded-lg text-xl font-bold',
-                  isLocked
-                    ? 'bg-gray-700 text-gray-400'
-                    : 'bg-indigo-600 text-white'
-                )}
-              >
-                {homeScore}
-              </span>
-              {!isLocked && (
-                <button
-                  onClick={() => handleScoreChange('home', -1)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
-                >
-                  -
-                </button>
-              )}
-            </div>
-            <span className="text-gray-500 font-bold">-</span>
-            <div className="flex flex-col items-center">
-              {!isLocked && (
-                <button
-                  onClick={() => handleScoreChange('away', 1)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
-                >
-                  +
-                </button>
-              )}
-              <span
-                className={cn(
-                  'w-10 h-10 flex items-center justify-center rounded-lg text-xl font-bold',
-                  isLocked
-                    ? 'bg-gray-700 text-gray-400'
-                    : 'bg-indigo-600 text-white'
-                )}
-              >
-                {awayScore}
-              </span>
-              {!isLocked && (
-                <button
-                  onClick={() => handleScoreChange('away', -1)}
-                  className="text-gray-400 hover:text-white text-lg leading-none"
-                >
-                  -
-                </button>
-              )}
+          {/* Final score prediction */}
+          <div>
+            <p className="text-xs text-gray-400 text-center mb-1">Final</p>
+            <div className="flex items-center gap-2">
+              <ScoreInput
+                value={homeScore}
+                onChange={(delta) => handleScoreChange('full', 'home', delta)}
+                locked={isLocked}
+                color="indigo"
+              />
+              <span className="text-gray-500 font-bold">-</span>
+              <ScoreInput
+                value={awayScore}
+                onChange={(delta) => handleScoreChange('full', 'away', delta)}
+                locked={isLocked}
+                color="indigo"
+              />
             </div>
           </div>
 
-          {/* Result indicator */}
-          {isFinished && prediction && (
-            <div
-              className={cn(
-                'flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full',
-                didWin
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-red-500/20 text-red-400'
-              )}
-            >
-              {didWin ? (
-                <>
-                  <Check className="w-3 h-3" />
-                  +1 punto
-                </>
-              ) : (
-                <>
-                  <X className="w-3 h-3" />
-                  Fallaste
-                </>
-              )}
+          {/* Halftime score prediction */}
+          <div>
+            <p className="text-xs text-gray-400 text-center mb-1">Descanso</p>
+            <div className="flex items-center gap-2">
+              <ScoreInput
+                value={homeScoreHT}
+                onChange={(delta) => handleScoreChange('half', 'home', delta)}
+                locked={isLocked}
+                color="purple"
+                small
+              />
+              <span className="text-gray-500 font-bold text-sm">-</span>
+              <ScoreInput
+                value={awayScoreHT}
+                onChange={(delta) => handleScoreChange('half', 'away', delta)}
+                locked={isLocked}
+                color="purple"
+                small
+              />
             </div>
+          </div>
+
+          {/* Points breakdown */}
+          {isFinished && prediction && (
+            <PointsBreakdown prediction={prediction} />
           )}
         </div>
 
@@ -297,7 +284,7 @@ export function MatchCard({
         <div className="mt-4 pt-3 border-t border-gray-700">
           <div className="flex items-center gap-1 text-xs text-green-400 mb-2">
             <Trophy className="w-3 h-3" />
-            <span className="font-medium">Acertaron:</span>
+            <span className="font-medium">Puntuaciones:</span>
           </div>
           <div className="space-y-1">
             {winners.map((winner, idx) => (
@@ -306,12 +293,108 @@ export function MatchCard({
                 className="flex items-center justify-between text-xs bg-green-500/10 rounded px-2 py-1"
               >
                 <span className="text-green-400 font-medium">{winner.name}</span>
-                <span className="text-green-300">+1 punto</span>
+                <span className="text-green-300">+{winner.points} pts</span>
               </div>
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Score input component
+function ScoreInput({
+  value,
+  onChange,
+  locked,
+  color,
+  small = false,
+}: {
+  value: number;
+  onChange: (delta: number) => void;
+  locked: boolean;
+  color: 'indigo' | 'purple';
+  small?: boolean;
+}) {
+  const bgColor = color === 'indigo' ? 'bg-indigo-600' : 'bg-purple-600';
+  const lockedBg = 'bg-gray-700';
+
+  return (
+    <div className="flex flex-col items-center">
+      {!locked && (
+        <button
+          onClick={() => onChange(1)}
+          className={cn(
+            'text-gray-400 hover:text-white leading-none',
+            small ? 'text-sm' : 'text-lg'
+          )}
+        >
+          +
+        </button>
+      )}
+      <span
+        className={cn(
+          'flex items-center justify-center rounded-lg font-bold',
+          locked ? `${lockedBg} text-gray-400` : `${bgColor} text-white`,
+          small ? 'w-8 h-8 text-base' : 'w-10 h-10 text-xl'
+        )}
+      >
+        {value}
+      </span>
+      {!locked && (
+        <button
+          onClick={() => onChange(-1)}
+          className={cn(
+            'text-gray-400 hover:text-white leading-none',
+            small ? 'text-sm' : 'text-lg'
+          )}
+        >
+          -
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Points breakdown component
+function PointsBreakdown({ prediction }: { prediction: Prediction }) {
+  const points = [
+    { label: 'Ganador', value: prediction.points_winner, max: 1 },
+    { label: 'Descanso', value: prediction.points_halftime, max: 2 },
+    { label: 'Diferencia', value: prediction.points_difference, max: 3 },
+    { label: 'Exacto', value: prediction.points_exact, max: 4 },
+  ];
+
+  const total = prediction.points ?? 0;
+
+  if (total === 0) {
+    return (
+      <div className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-red-500/20 text-red-400">
+        <X className="w-3 h-3" />
+        0 puntos
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-green-500/10 rounded-lg p-2 w-full">
+      <div className="grid grid-cols-2 gap-1 text-xs">
+        {points.map(
+          (p) =>
+            p.value != null &&
+            p.value > 0 && (
+              <div key={p.label} className="flex items-center justify-between">
+                <span className="text-gray-400">{p.label}</span>
+                <span className="text-green-400 font-medium">+{p.value}</span>
+              </div>
+            )
+        )}
+      </div>
+      <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-green-500/20">
+        <Check className="w-3 h-3 text-green-400" />
+        <span className="text-green-400 font-bold">{total} puntos</span>
+      </div>
     </div>
   );
 }

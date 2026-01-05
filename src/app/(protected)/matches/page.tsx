@@ -109,7 +109,9 @@ export default function MatchesPage() {
   const handleSavePrediction = async (
     matchId: string,
     homeScore: number,
-    awayScore: number
+    awayScore: number,
+    homeScoreHalftime: number,
+    awayScoreHalftime: number
   ) => {
     if (!selectedUserId) return;
 
@@ -123,6 +125,8 @@ export default function MatchesPage() {
           match_id: matchId,
           home_score: homeScore,
           away_score: awayScore,
+          home_score_halftime: homeScoreHalftime,
+          away_score_halftime: awayScoreHalftime,
         },
         { onConflict: 'user_id,match_id' }
       )

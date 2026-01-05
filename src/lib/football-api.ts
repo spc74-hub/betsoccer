@@ -62,6 +62,10 @@ interface FootballDataMatch {
       home: number | null;
       away: number | null;
     };
+    halfTime: {
+      home: number | null;
+      away: number | null;
+    };
   };
 }
 
@@ -108,6 +112,8 @@ export async function fetchTeamMatches(teamId: number): Promise<Partial<Match>[]
       status: mapStatus(match.status),
       home_score: match.score.fullTime.home ?? undefined,
       away_score: match.score.fullTime.away ?? undefined,
+      home_score_halftime: match.score.halfTime?.home ?? undefined,
+      away_score_halftime: match.score.halfTime?.away ?? undefined,
     };
   });
 }
@@ -164,6 +170,8 @@ export async function fetchMatchById(matchId: number): Promise<Partial<Match> | 
     status: mapStatus(match.status),
     home_score: match.score.fullTime.home ?? undefined,
     away_score: match.score.fullTime.away ?? undefined,
+    home_score_halftime: match.score.halfTime?.home ?? undefined,
+    away_score_halftime: match.score.halfTime?.away ?? undefined,
   };
 }
 
@@ -207,6 +215,8 @@ export async function fetchCompetitionMatches(competitionId: string): Promise<Pa
       status: mapStatus(match.status),
       home_score: match.score.fullTime.home ?? undefined,
       away_score: match.score.fullTime.away ?? undefined,
+      home_score_halftime: match.score.halfTime?.home ?? undefined,
+      away_score_halftime: match.score.halfTime?.away ?? undefined,
     };
   });
 }

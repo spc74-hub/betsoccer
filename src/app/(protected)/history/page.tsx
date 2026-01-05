@@ -9,7 +9,7 @@ import { Loader2, History } from 'lucide-react';
 
 interface WinnerInfo {
   name: string;
-  score: string;
+  points: number;
 }
 
 export default function HistoryPage() {
@@ -73,24 +73,28 @@ export default function HistoryPage() {
       });
       setPredictions(predictionsMap);
 
-      // Fetch ALL predictions with points = 1 to find winners
-      const { data: allWinningPredictions } = await supabase
+      // Fetch ALL predictions with points > 0 to find scorers
+      const { data: allScoringPredictions } = await supabase
         .from('predictions')
         .select('*')
         .in('match_id', matchIds)
-        .eq('points', 1);
+        .gt('points', 0);
 
       // Build winners map
       const winnersMap: Record<string, WinnerInfo[]> = {};
-      allWinningPredictions?.forEach((p) => {
+      allScoringPredictions?.forEach((p) => {
         const userName = usersMap[p.user_id]?.display_name || 'Usuario';
         if (!winnersMap[p.match_id]) {
           winnersMap[p.match_id] = [];
         }
         winnersMap[p.match_id].push({
           name: userName,
-          score: `${p.home_score} - ${p.away_score}`,
+          points: p.points ?? 0,
         });
+      });
+      // Sort by points descending
+      Object.keys(winnersMap).forEach((matchId) => {
+        winnersMap[matchId].sort((a, b) => b.points - a.points);
       });
       setWinners(winnersMap);
     }
@@ -166,7 +170,7 @@ export default function HistoryPage() {
               key={match.id}
               match={match}
               prediction={predictions[match.id]}
-              onSavePrediction={async () => {}}
+              onSavePrediction={async () => { /* readonly */ }}
               showResult
               winners={winners[match.id]}
             />

@@ -125,9 +125,12 @@ export default function JornadaPage() {
     );
   }
 
-  // Helper to check if prediction was correct
-  const isPredictionCorrect = (prediction: Prediction, match: Match): boolean => {
-    return prediction.home_score === match.home_score && prediction.away_score === match.away_score;
+  // Helper to get total points
+  const getTotalPoints = (prediction: Prediction): number => {
+    return (prediction.points_winner ?? 0) +
+           (prediction.points_halftime ?? 0) +
+           (prediction.points_difference ?? 0) +
+           (prediction.points_exact ?? 0);
   };
 
   return (
@@ -271,7 +274,10 @@ export default function JornadaPage() {
                             <div className="flex items-center gap-2">
                               {hasPrediction ? (
                                 <span className="flex items-center gap-2">
-                                  <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm">
+                                  <span className="bg-purple-600 px-2 py-1 rounded text-white font-medium text-xs" title="Descanso">
+                                    {prediction.home_score_halftime ?? 0} - {prediction.away_score_halftime ?? 0}
+                                  </span>
+                                  <span className="bg-indigo-600 px-3 py-1 rounded text-white font-bold text-sm" title="Final">
                                     {prediction.home_score} - {prediction.away_score}
                                   </span>
                                   <Check className="w-4 h-4 text-green-400" />
@@ -344,10 +350,17 @@ export default function JornadaPage() {
                       />
                     )}
                   </div>
-                  <div className="bg-gray-700 px-4 py-2 rounded-lg">
-                    <span className="text-2xl font-bold text-white">
-                      {match.home_score} - {match.away_score}
-                    </span>
+                  <div className="text-center">
+                    {match.home_score_halftime !== null && match.away_score_halftime !== null && (
+                      <div className="text-xs text-gray-500 mb-1">
+                        (Descanso: {match.home_score_halftime} - {match.away_score_halftime})
+                      </div>
+                    )}
+                    <div className="bg-gray-700 px-4 py-2 rounded-lg">
+                      <span className="text-2xl font-bold text-white">
+                        {match.home_score} - {match.away_score}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 flex-1">
                     {match.away_team_logo && (
@@ -368,42 +381,54 @@ export default function JornadaPage() {
                     {users.map((user) => {
                       const prediction = match.predictions[user.id];
                       const hasPrediction = !!prediction;
-                      const isCorrect = hasPrediction && isPredictionCorrect(prediction, match);
+                      const totalPoints = hasPrediction ? getTotalPoints(prediction) : 0;
+                      const hasPoints = totalPoints > 0;
 
                       return (
                         <div
                           key={user.id}
                           className={cn(
                             'flex items-center justify-between py-2 px-3 rounded-lg',
-                            isCorrect
+                            hasPoints
                               ? 'bg-green-900/30 border border-green-700'
                               : 'bg-gray-900/50'
                           )}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-white">
                               {user.display_name}
                             </span>
-                            {isCorrect && (
+                            {hasPoints && (
                               <span className="bg-green-600 text-xs px-2 py-0.5 rounded font-medium">
-                                +1 punto
+                                +{totalPoints} pts
                               </span>
                             )}
+                            {hasPrediction && hasPoints && (
+                              <div className="flex gap-1 text-[10px]">
+                                {prediction.points_winner ? <span className="bg-blue-600/50 px-1 rounded">1X2</span> : null}
+                                {prediction.points_halftime ? <span className="bg-purple-600/50 px-1 rounded">HT</span> : null}
+                                {prediction.points_difference ? <span className="bg-orange-600/50 px-1 rounded">DIF</span> : null}
+                                {prediction.points_exact ? <span className="bg-green-600/50 px-1 rounded">EXACTO</span> : null}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             {hasPrediction ? (
                               <>
+                                <span className="bg-purple-600/80 px-2 py-1 rounded text-white font-medium text-xs" title="Descanso">
+                                  {prediction.home_score_halftime ?? 0} - {prediction.away_score_halftime ?? 0}
+                                </span>
                                 <span
                                   className={cn(
                                     'px-3 py-1 rounded font-bold text-sm',
-                                    isCorrect
+                                    hasPoints
                                       ? 'bg-green-600 text-white'
                                       : 'bg-gray-700 text-gray-300'
                                   )}
                                 >
                                   {prediction.home_score} - {prediction.away_score}
                                 </span>
-                                {isCorrect ? (
+                                {hasPoints ? (
                                   <Check className="w-5 h-5 text-green-400" />
                                 ) : (
                                   <X className="w-5 h-5 text-red-400" />

@@ -165,6 +165,7 @@ CREATE TRIGGER on_match_inserted_finished
   EXECUTE PROCEDURE public.calculate_prediction_points();
 
 -- 8. Function to manually recalculate all points (for fixing existing data)
+DROP FUNCTION IF EXISTS public.recalculate_all_points();
 CREATE OR REPLACE FUNCTION public.recalculate_all_points()
 RETURNS TABLE(match_id uuid, predictions_updated integer) AS $$
 DECLARE

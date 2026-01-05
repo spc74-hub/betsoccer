@@ -70,6 +70,18 @@ export interface Standing {
   accuracy: number;
 }
 
+export interface Season {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date?: string;
+  is_active: boolean;
+  winner_user_id?: string;
+  winner_name?: string;
+  winner_points?: number;
+  created_at: string;
+}
+
 // API-Football types
 export interface APIFootballMatch {
   fixture: {

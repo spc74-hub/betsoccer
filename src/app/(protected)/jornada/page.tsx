@@ -377,67 +377,93 @@ export default function JornadaPage() {
                 {/* Predictions with results */}
                 <div className="border-t border-gray-700 pt-4">
                   <h3 className="text-sm font-medium text-gray-400 mb-3">Resultados</h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {users.map((user) => {
                       const prediction = match.predictions[user.id];
                       const hasPrediction = !!prediction;
                       const totalPoints = hasPrediction ? getTotalPoints(prediction) : 0;
                       const hasPoints = totalPoints > 0;
 
+                      // Calculate what user got right/wrong
+                      const getWinnerType = (home: number, away: number) => home > away ? '1' : home < away ? '2' : 'X';
+                      const matchWinner = match.home_score != null && match.away_score != null
+                        ? getWinnerType(match.home_score as number, match.away_score as number) : null;
+                      const predWinner = hasPrediction
+                        ? getWinnerType(prediction.home_score, prediction.away_score) : null;
+                      const matchDiff = match.home_score != null && match.away_score != null
+                        ? (match.home_score as number) - (match.away_score as number) : null;
+                      const predDiff = hasPrediction
+                        ? prediction.home_score - prediction.away_score : null;
+
                       return (
                         <div
                           key={user.id}
                           className={cn(
-                            'flex items-center justify-between py-2 px-3 rounded-lg',
+                            'py-3 px-3 rounded-lg',
                             hasPoints
                               ? 'bg-green-900/30 border border-green-700'
                               : 'bg-gray-900/50'
                           )}
                         >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-white">
-                              {user.display_name}
-                            </span>
-                            {hasPoints && (
-                              <span className="bg-green-600 text-xs px-2 py-0.5 rounded font-medium">
-                                +{totalPoints} pts
+                          {/* Header with name and total points */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white">
+                                {user.display_name}
                               </span>
-                            )}
-                            {hasPrediction && hasPoints && (
-                              <div className="flex gap-1 text-[10px]">
-                                {prediction.points_winner ? <span className="bg-blue-600/50 px-1 rounded">1X2</span> : null}
-                                {prediction.points_halftime ? <span className="bg-purple-600/50 px-1 rounded">HT</span> : null}
-                                {prediction.points_difference ? <span className="bg-orange-600/50 px-1 rounded">DIF</span> : null}
-                                {prediction.points_exact ? <span className="bg-green-600/50 px-1 rounded">EXACTO</span> : null}
+                              {hasPoints && (
+                                <span className="bg-green-600 text-xs px-2 py-0.5 rounded font-bold">
+                                  +{totalPoints} pts
+                                </span>
+                              )}
+                            </div>
+                            {hasPrediction && (
+                              <div className="flex items-center gap-2">
+                                <span className="bg-purple-600/80 px-2 py-1 rounded text-white font-medium text-xs">
+                                  {prediction.home_score_halftime ?? 0} - {prediction.away_score_halftime ?? 0}
+                                </span>
+                                <span className="bg-indigo-600 px-2 py-1 rounded text-white font-bold text-sm">
+                                  {prediction.home_score} - {prediction.away_score}
+                                </span>
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            {hasPrediction ? (
-                              <>
-                                <span className="bg-purple-600/80 px-2 py-1 rounded text-white font-medium text-xs" title="Descanso">
-                                  {prediction.home_score_halftime ?? 0} - {prediction.away_score_halftime ?? 0}
-                                </span>
-                                <span
-                                  className={cn(
-                                    'px-3 py-1 rounded font-bold text-sm',
-                                    hasPoints
-                                      ? 'bg-green-600 text-white'
-                                      : 'bg-gray-700 text-gray-300'
-                                  )}
-                                >
-                                  {prediction.home_score} - {prediction.away_score}
-                                </span>
-                                {hasPoints ? (
-                                  <Check className="w-5 h-5 text-green-400" />
-                                ) : (
-                                  <X className="w-5 h-5 text-red-400" />
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-gray-500 text-sm">Sin pronostico</span>
-                            )}
-                          </div>
+
+                          {/* Points breakdown */}
+                          {hasPrediction ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[10px]">
+                              <div className={cn(
+                                'px-2 py-1 rounded flex items-center justify-between',
+                                prediction.points_winner ? 'bg-blue-600/30 text-blue-300' : 'bg-gray-800/50 text-gray-500'
+                              )}>
+                                <span>1X2: {predWinner}</span>
+                                <span>{prediction.points_winner ? '+1' : matchWinner !== predWinner ? `(${matchWinner})` : ''}</span>
+                              </div>
+                              <div className={cn(
+                                'px-2 py-1 rounded flex items-center justify-between',
+                                prediction.points_halftime ? 'bg-purple-600/30 text-purple-300' : 'bg-gray-800/50 text-gray-500'
+                              )}>
+                                <span>HT: {prediction.home_score_halftime ?? 0}-{prediction.away_score_halftime ?? 0}</span>
+                                <span>{prediction.points_halftime ? '+2' : `(${match.home_score_halftime ?? '?'}-${match.away_score_halftime ?? '?'})`}</span>
+                              </div>
+                              <div className={cn(
+                                'px-2 py-1 rounded flex items-center justify-between',
+                                prediction.points_difference ? 'bg-orange-600/30 text-orange-300' : 'bg-gray-800/50 text-gray-500'
+                              )}>
+                                <span>DIF: {predDiff !== null ? (predDiff > 0 ? `+${predDiff}` : predDiff) : '?'}</span>
+                                <span>{prediction.points_difference ? '+3' : matchDiff !== null ? `(${matchDiff > 0 ? `+${matchDiff}` : matchDiff})` : ''}</span>
+                              </div>
+                              <div className={cn(
+                                'px-2 py-1 rounded flex items-center justify-between',
+                                prediction.points_exact ? 'bg-green-600/30 text-green-300' : 'bg-gray-800/50 text-gray-500'
+                              )}>
+                                <span>EXACTO</span>
+                                <span>{prediction.points_exact ? '+4' : '✗'}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 text-xs">Sin pronóstico</span>
+                          )}
                         </div>
                       );
                     })}

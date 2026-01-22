@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       // Check if match exists
       const { data: existing } = await supabase
         .from('matches')
-        .select('id, status, home_score, away_score')
+        .select('id, status, home_score, away_score, home_score_halftime, away_score_halftime')
         .eq('external_id', match.external_id)
         .single();
 
@@ -61,7 +61,9 @@ export async function POST(request: Request) {
         const needsUpdate =
           existing.status !== match.status ||
           existing.home_score !== match.home_score ||
-          existing.away_score !== match.away_score;
+          existing.away_score !== match.away_score ||
+          existing.home_score_halftime !== match.home_score_halftime ||
+          existing.away_score_halftime !== match.away_score_halftime;
 
         if (needsUpdate) {
           const { error } = await supabase
@@ -70,6 +72,8 @@ export async function POST(request: Request) {
               status: match.status,
               home_score: match.home_score,
               away_score: match.away_score,
+              home_score_halftime: match.home_score_halftime,
+              away_score_halftime: match.away_score_halftime,
               kickoff_utc: match.kickoff_utc,
               venue: match.venue,
             })
@@ -98,6 +102,8 @@ export async function POST(request: Request) {
           status: match.status,
           home_score: match.home_score,
           away_score: match.away_score,
+          home_score_halftime: match.home_score_halftime,
+          away_score_halftime: match.away_score_halftime,
         });
 
         if (error) {

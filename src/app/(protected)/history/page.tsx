@@ -73,16 +73,15 @@ export default function HistoryPage() {
       });
       setPredictions(predictionsMap);
 
-      // Fetch ALL predictions with points > 0 to find scorers
-      const { data: allScoringPredictions } = await supabase
+      // Fetch ALL predictions for these matches
+      const { data: allPredictionsData } = await supabase
         .from('predictions')
         .select('*')
-        .in('match_id', matchIds)
-        .gt('points', 0);
+        .in('match_id', matchIds);
 
       // Build winners map
       const winnersMap: Record<string, WinnerInfo[]> = {};
-      allScoringPredictions?.forEach((p) => {
+      allPredictionsData?.forEach((p) => {
         const userName = usersMap[p.user_id]?.display_name || 'Usuario';
         if (!winnersMap[p.match_id]) {
           winnersMap[p.match_id] = [];

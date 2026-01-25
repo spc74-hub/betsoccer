@@ -42,7 +42,22 @@ export async function POST(request: Request) {
 
   try {
     const supabase = getServiceClient();
-    const matches = await fetchAllTrackedMatches();
+
+    // Fetch matches from external API
+    let matches;
+    try {
+      console.log('🔄 Fetching matches from Football API...');
+      matches = await fetchAllTrackedMatches();
+      console.log(`✅ Successfully fetched ${matches.length} matches from API`);
+    } catch (apiError) {
+      console.error('❌ Failed to fetch from Football API:', apiError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to fetch matches from Football API',
+        details: apiError instanceof Error ? apiError.message : String(apiError),
+        hint: 'Check FOOTBALL_DATA_KEY environment variable and API quota'
+      }, { status: 500 });
+    }
 
     let created = 0;
     let updated = 0;
@@ -115,13 +130,17 @@ export async function POST(request: Request) {
       }
     }
 
+    console.log(`✅ Sync complete: ${created} created, ${updated} updated, ${errors} errors`);
+
     return NextResponse.json({
       success: true,
+      message: 'Matches synced successfully',
       stats: {
         total: matches.length,
         created,
         updated,
         errors,
+        timestamp: new Date().toISOString()
       },
     });
   } catch (error) {

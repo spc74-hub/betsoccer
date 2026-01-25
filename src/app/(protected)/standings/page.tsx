@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Standing, Season } from '@/types';
-import { Loader2, Trophy, Target, Percent, Info, History, Plus, ChevronDown, ChevronUp, ChevronRight, Award, Clock, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Loader2, Trophy, Target, Percent, Info, History, Plus, ChevronDown, ChevronUp, ChevronRight, Award, Clock, TrendingUp, CheckCircle2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function StandingsPage() {
@@ -18,6 +18,7 @@ export default function StandingsPage() {
   const [newSeasonName, setNewSeasonName] = useState('');
   const [closing, setClosing] = useState(false);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [userPredictions, setUserPredictions] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     async function fetchData() {
@@ -107,7 +108,9 @@ export default function StandingsPage() {
     });
   };
 
-  const toggleUserExpansion = (userId: string) => {
+  const toggleUserExpansion = async (userId: string) => {
+    const isCurrentlyExpanded = expandedUsers.has(userId);
+
     setExpandedUsers(prev => {
       const newSet = new Set(prev);
       if (newSet.has(userId)) {
@@ -117,6 +120,38 @@ export default function StandingsPage() {
       }
       return newSet;
     });
+
+    // Load predictions if expanding and not already loaded
+    if (!isCurrentlyExpanded && !userPredictions[userId]) {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('predictions')
+        .select(`
+          *,
+          match:matches(
+            id,
+            home_team,
+            away_team,
+            home_team_logo,
+            away_team_logo,
+            home_score,
+            away_score,
+            home_score_halftime,
+            away_score_halftime,
+            kickoff_utc
+          )
+        `)
+        .eq('user_id', userId)
+        .gt('points', 0)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setUserPredictions(prev => ({
+          ...prev,
+          [userId]: data
+        }));
+      }
+    }
   };
 
   return (
@@ -266,96 +301,187 @@ export default function StandingsPage() {
 
                 {/* Points Breakdown - Expandable */}
                 {isExpanded && hasBreakdown && (
-                  <div className="mt-2 ml-6 p-4 bg-gray-900/80 rounded-lg border border-gray-700/50">
-                    <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-                      <Award className="w-4 h-4" />
-                      Desglose de puntos
-                    </h4>
-                    <div className="space-y-3">
-                      {/* Winner points */}
-                      {(standing.points_winner || 0) > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-400 flex items-center gap-2">
-                              <Trophy className="w-3.5 h-3.5 text-green-400" />
-                              Ganador (1/X/2)
-                            </span>
-                            <span className="text-green-400 font-medium">
-                              {standing.points_winner} pts
-                            </span>
+                  <div className="mt-2 ml-6 p-4 bg-gray-900/80 rounded-lg border border-gray-700/50 space-y-4">
+                    {/* Summary by category */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                        <Award className="w-4 h-4" />
+                        Resumen por categoría
+                      </h4>
+                      <div className="space-y-3">
+                        {/* Winner points */}
+                        {(standing.points_winner || 0) > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-2">
+                                <Trophy className="w-3.5 h-3.5 text-green-400" />
+                                Ganador (1/X/2)
+                              </span>
+                              <span className="text-green-400 font-medium">
+                                {standing.points_winner} pts
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 rounded-full"
+                                style={{ width: `${(standing.points_winner! / standing.total_points) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 rounded-full"
-                              style={{ width: `${(standing.points_winner! / standing.total_points) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Halftime points */}
-                      {(standing.points_halftime || 0) > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-400 flex items-center gap-2">
-                              <Clock className="w-3.5 h-3.5 text-blue-400" />
-                              Resultado descanso
-                            </span>
-                            <span className="text-blue-400 font-medium">
-                              {standing.points_halftime} pts
-                            </span>
+                        {/* Halftime points */}
+                        {(standing.points_halftime || 0) > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5 text-blue-400" />
+                                Resultado descanso
+                              </span>
+                              <span className="text-blue-400 font-medium">
+                                {standing.points_halftime} pts
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full"
+                                style={{ width: `${(standing.points_halftime! / standing.total_points) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 rounded-full"
-                              style={{ width: `${(standing.points_halftime! / standing.total_points) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Difference points */}
-                      {(standing.points_difference || 0) > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-400 flex items-center gap-2">
-                              <TrendingUp className="w-3.5 h-3.5 text-yellow-400" />
-                              Diferencia de goles
-                            </span>
-                            <span className="text-yellow-400 font-medium">
-                              {standing.points_difference} pts
-                            </span>
+                        {/* Difference points */}
+                        {(standing.points_difference || 0) > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-2">
+                                <TrendingUp className="w-3.5 h-3.5 text-yellow-400" />
+                                Diferencia de goles
+                              </span>
+                              <span className="text-yellow-400 font-medium">
+                                {standing.points_difference} pts
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-yellow-500 rounded-full"
+                                style={{ width: `${(standing.points_difference! / standing.total_points) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-yellow-500 rounded-full"
-                              style={{ width: `${(standing.points_difference! / standing.total_points) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Exact points */}
-                      {(standing.points_exact || 0) > 0 && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-400 flex items-center gap-2">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
-                              Resultado exacto
-                            </span>
-                            <span className="text-purple-400 font-medium">
-                              {standing.points_exact} pts
-                            </span>
+                        {/* Exact points */}
+                        {(standing.points_exact || 0) > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-400 flex items-center gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+                                Resultado exacto
+                              </span>
+                              <span className="text-purple-400 font-medium">
+                                {standing.points_exact} pts
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-500 rounded-full"
+                                style={{ width: `${(standing.points_exact! / standing.total_points) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-purple-500 rounded-full"
-                              style={{ width: `${(standing.points_exact! / standing.total_points) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
+
+                    {/* Match-by-match breakdown */}
+                    {userPredictions[standing.user_id] && userPredictions[standing.user_id].length > 0 && (
+                      <div className="pt-4 border-t border-gray-700">
+                        <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Partidos con puntos ({userPredictions[standing.user_id].length})
+                        </h4>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {userPredictions[standing.user_id].map((pred: any) => (
+                            <div
+                              key={pred.id}
+                              className="p-3 bg-gray-800/60 rounded-lg border border-gray-700/50"
+                            >
+                              {/* Match info */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span>
+                                    {new Date(pred.match.kickoff_utc).toLocaleDateString('es-ES', {
+                                      day: 'numeric',
+                                      month: 'short'
+                                    })}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold text-white">
+                                  {pred.points} pts
+                                </span>
+                              </div>
+
+                              {/* Teams and scores */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <span className="text-sm text-white truncate">
+                                    {pred.match.home_team}
+                                  </span>
+                                  <span className="text-xs font-bold text-gray-300">
+                                    {pred.match.home_score}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-500 px-2">vs</span>
+                                <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                                  <span className="text-xs font-bold text-gray-300">
+                                    {pred.match.away_score}
+                                  </span>
+                                  <span className="text-sm text-white truncate">
+                                    {pred.match.away_team}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Prediction */}
+                              <div className="text-xs text-gray-400 mb-2">
+                                Tu predicción: {pred.home_score}-{pred.away_score}
+                                {pred.home_score_halftime !== null && pred.home_score_halftime !== 0 && (
+                                  <span className="ml-2">
+                                    (HT: {pred.home_score_halftime}-{pred.away_score_halftime})
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Points breakdown for this match */}
+                              <div className="flex flex-wrap gap-2">
+                                {pred.points_winner > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
+                                    Ganador +{pred.points_winner}
+                                  </span>
+                                )}
+                                {pred.points_halftime > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                                    Descanso +{pred.points_halftime}
+                                  </span>
+                                )}
+                                {pred.points_difference > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                                    Diferencia +{pred.points_difference}
+                                  </span>
+                                )}
+                                {pred.points_exact > 0 && (
+                                  <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                                    Exacto +{pred.points_exact}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -193,7 +193,7 @@ export default function StandingsPage() {
                 'flex items-center gap-4 p-4 rounded-xl border transition-all',
                 getRankStyle(index),
                 currentUserId === standing.user_id &&
-                  'ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-950'
+                'ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-950'
               )}
             >
               {/* Rank */}
@@ -253,9 +253,9 @@ export default function StandingsPage() {
             <p className="text-2xl font-bold text-white mt-1">
               {standings.length > 0
                 ? (
-                    standings.reduce((acc, s) => acc + Number(s.accuracy), 0) /
-                    standings.length
-                  ).toFixed(1)
+                  standings.reduce((acc, s) => acc + Number(s.accuracy), 0) /
+                  standings.length
+                ).toFixed(1)
                 : 0}
               %
             </p>
@@ -287,40 +287,12 @@ export default function StandingsPage() {
               <p className="text-gray-500 text-sm py-2">No hay temporadas registradas</p>
             ) : (
               seasons.map((season) => (
-                <div
+                <SeasonCard
                   key={season.id}
-                  className={cn(
-                    'p-3 rounded-lg border',
-                    season.is_active
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-gray-900/50 border-gray-700'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium text-white">{season.name}</span>
-                      {season.is_active && (
-                        <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">
-                          Activa
-                        </span>
-                      )}
-                    </div>
-                    {season.winner_user_id && (
-                      <div className="text-right">
-                        <span className="text-yellow-400 font-medium">
-                          🏆 {season.winner_name}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatDate(season.start_date)}
-                    {season.end_date && ` - ${formatDate(season.end_date)}`}
-                  </p>
-                </div>
+                  season={season}
+                />
               ))
-            )}
-          </div>
+            )}\n          </div>
         )}
 
         {/* New season button */}
@@ -392,6 +364,137 @@ export default function StandingsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Season card component with expandable standings
+function SeasonCard({ season }: { season: Season }) {
+  const [expanded, setExpanded] = useState(false);
+  const [standings, setStandings] = useState<Standing[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const loadStandings = async () => {
+    if (standings.length > 0) return; // Already loaded
+
+    setLoading(true);
+    const supabase = createClient();
+
+    const { data } = await supabase
+      .from('standings_by_season')
+      .select('*')
+      .eq('season_id', season.id)
+      .gt('total_predictions', 0)
+      .order('total_points', { ascending: false });
+
+    setStandings(data || []);
+    setLoading(false);
+  };
+
+  const handleToggle = async () => {
+    if (!expanded) {
+      await loadStandings();
+    }
+    setExpanded(!expanded);
+  };
+
+  return (
+    <div
+      className={cn(
+        'rounded-lg border overflow-hidden',
+        season.is_active
+          ? 'bg-green-500/10 border-green-500/30'
+          : 'bg-gray-900/50 border-gray-700'
+      )}
+    >
+      <div
+        className="p-3 cursor-pointer hover:bg-gray-800/50 transition-colors"
+        onClick={handleToggle}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-white">{season.name}</span>
+              {season.is_active && (
+                <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">
+                  Activa
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {formatDate(season.start_date)}
+              {season.end_date && ` - ${formatDate(season.end_date)}`}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {season.winner_user_id && !season.is_active && (
+              <span className="text-sm text-yellow-400 font-medium">
+                🏆 {season.winner_name}
+              </span>
+            )}
+            <span className="text-gray-400">
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-700 p-3 bg-gray-950/50">
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+            </div>
+          ) : standings.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-2">
+              No hay predicciones en esta temporada
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-400 mb-2">Clasificación final:</p>
+              {standings.map((standing, idx) => (
+                <div
+                  key={standing.user_id}
+                  className={cn(
+                    'flex items-center justify-between p-2 rounded',
+                    idx === 0 ? 'bg-yellow-500/10' : 'bg-gray-800/50'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'text-sm font-bold w-5',
+                      idx === 0 ? 'text-yellow-400' : 'text-gray-400'
+                    )}>
+                      {idx === 0 ? '🥇' : `${idx + 1}.`}
+                    </span>
+                    <span className="text-sm text-white">{standing.display_name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-gray-400">
+                      {standing.correct_predictions}/{standing.total_predictions}
+                    </span>
+                    <span className={cn(
+                      'font-bold',
+                      idx === 0 ? 'text-yellow-400' : 'text-white'
+                    )}>
+                      {standing.total_points} pts
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

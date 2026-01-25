@@ -15,6 +15,19 @@ interface WinnerInfo {
   points: number;
 }
 
+interface PredictionDetail {
+  user_name: string;
+  home_score: number;
+  away_score: number;
+  home_score_halftime: number | null;
+  away_score_halftime: number | null;
+  points: number;
+  points_winner: number | null;
+  points_halftime: number | null;
+  points_difference: number | null;
+  points_exact: number | null;
+}
+
 interface MatchCardProps {
   match: Match;
   prediction?: Prediction;
@@ -27,6 +40,7 @@ interface MatchCardProps {
   ) => Promise<void>;
   showResult?: boolean;
   winners?: WinnerInfo[];
+  allPredictions?: PredictionDetail[];
 }
 
 export function MatchCard({
@@ -35,6 +49,7 @@ export function MatchCard({
   onSavePrediction,
   showResult = false,
   winners,
+  allPredictions,
 }: MatchCardProps) {
   const [homeScore, setHomeScore] = useState(prediction?.home_score ?? 0);
   const [awayScore, setAwayScore] = useState(prediction?.away_score ?? 0);
@@ -42,6 +57,7 @@ export function MatchCard({
   const [awayScoreHT, setAwayScoreHT] = useState(prediction?.away_score_halftime ?? 0);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showAllPredictions, setShowAllPredictions] = useState(false);
 
   // Sync state when prediction prop changes
   useEffect(() => {
@@ -280,23 +296,91 @@ export function MatchCard({
       )}
 
       {/* Winners section */}
-      {isFinished && winners && winners.length > 0 && (
+      {isFinished && (winners && winners.length > 0 || allPredictions && allPredictions.length > 0) && (
         <div className="mt-4 pt-3 border-t border-gray-700">
-          <div className="flex items-center gap-1 text-xs text-green-400 mb-2">
-            <Trophy className="w-3 h-3" />
-            <span className="font-medium">Puntuaciones:</span>
+          <div
+            className="flex items-center justify-between cursor-pointer hover:bg-gray-700/30 rounded px-2 py-1 -mx-2"
+            onClick={() => setShowAllPredictions(!showAllPredictions)}
+          >
+            <div className="flex items-center gap-1 text-xs text-green-400">
+              <Trophy className="w-3 h-3" />
+              <span className="font-medium">Puntuaciones{allPredictions ? ` (${allPredictions.length})` : ''}</span>
+            </div>
+            {allPredictions && allPredictions.length > 0 && (
+              <span className="text-xs text-gray-500">
+                {showAllPredictions ? '▼' : '▶'} Ver detalles
+              </span>
+            )}
           </div>
-          <div className="space-y-1">
-            {winners.map((winner, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between text-xs bg-green-500/10 rounded px-2 py-1"
-              >
-                <span className="text-green-400 font-medium">{winner.name}</span>
-                <span className="text-green-300">+{winner.points} pts</span>
-              </div>
-            ))}
-          </div>
+
+          {!showAllPredictions && winners && (
+            <div className="space-y-1 mt-2">
+              {winners.map((winner, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-xs bg-green-500/10 rounded px-2 py-1"
+                >
+                  <span className="text-green-400 font-medium">{winner.name}</span>
+                  <span className="text-green-300">+{winner.points} pts</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showAllPredictions && allPredictions && (
+            <div className="space-y-3 mt-3">
+              {allPredictions.map((pred, idx) => (
+                <div key={idx} className="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-white">{pred.user_name}</span>
+                    <span className="text-sm font-bold text-green-400">+{pred.points} pts</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">Final:</span>
+                      <span className="ml-1 text-white">{pred.home_score}-{pred.away_score}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Descanso:</span>
+                      <span className="ml-1 text-white">
+                        {pred.home_score_halftime !== null ? `${pred.home_score_halftime}-${pred.away_score_halftime}` : '0-0'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {pred.points > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {pred.points_winner !== null && pred.points_winner > 0 && (
+                        <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
+                          Ganador +{pred.points_winner}
+                        </span>
+                      )}
+                      {pred.points_halftime !== null && pred.points_halftime > 0 && (
+                        <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">
+                          HT +{pred.points_halftime}
+                        </span>
+                      )}
+                      {pred.points_difference !== null && pred.points_difference > 0 && (
+                        <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
+                          Diferencia +{pred.points_difference}
+                        </span>
+                      )}
+                      {pred.points_exact !== null && pred.points_exact > 0 && (
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
+                          Exacto +{pred.points_exact}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {pred.points === 0 && (
+                    <div className="text-xs text-red-400 mt-2">Sin puntos</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -12,10 +12,24 @@ interface WinnerInfo {
   points: number;
 }
 
+interface PredictionDetail {
+  user_name: string;
+  home_score: number;
+  away_score: number;
+  home_score_halftime: number | null;
+  away_score_halftime: number | null;
+  points: number;
+  points_winner: number | null;
+  points_halftime: number | null;
+  points_difference: number | null;
+  points_exact: number | null;
+}
+
 export default function HistoryPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Record<string, Prediction>>({});
   const [winners, setWinners] = useState<Record<string, WinnerInfo[]>>({});
+  const [allPredictions, setAllPredictions] = useState<Record<string, PredictionDetail[]>>({});
   const [loading, setLoading] = useState(true);
   const [teamFilter, setTeamFilter] = useState<TeamFilterType>('all');
 
@@ -79,10 +93,14 @@ export default function HistoryPage() {
         .select('*')
         .in('match_id', matchIds);
 
-      // Build winners map
+      // Build winners map and predictions details map
       const winnersMap: Record<string, WinnerInfo[]> = {};
+      const allPredictionsMap: Record<string, PredictionDetail[]> = {};
+
       allPredictionsData?.forEach((p) => {
         const userName = usersMap[p.user_id]?.display_name || 'Usuario';
+
+        // Winners map (for simple display)
         if (!winnersMap[p.match_id]) {
           winnersMap[p.match_id] = [];
         }
@@ -90,12 +108,33 @@ export default function HistoryPage() {
           name: userName,
           points: p.points ?? 0,
         });
+
+        // Predictions details map (for expanded view)
+        if (!allPredictionsMap[p.match_id]) {
+          allPredictionsMap[p.match_id] = [];
+        }
+        allPredictionsMap[p.match_id].push({
+          user_name: userName,
+          home_score: p.home_score,
+          away_score: p.away_score,
+          home_score_halftime: p.home_score_halftime,
+          away_score_halftime: p.away_score_halftime,
+          points: p.points ?? 0,
+          points_winner: p.points_winner,
+          points_halftime: p.points_halftime,
+          points_difference: p.points_difference,
+          points_exact: p.points_exact,
+        });
       });
-      // Sort by points descending
+
+      // Sort both maps by points descending
       Object.keys(winnersMap).forEach((matchId) => {
         winnersMap[matchId].sort((a, b) => b.points - a.points);
+        allPredictionsMap[matchId].sort((a, b) => b.points - a.points);
       });
+
       setWinners(winnersMap);
+      setAllPredictions(allPredictionsMap);
     }
 
     setMatches(matchesData || []);
@@ -172,6 +211,7 @@ export default function HistoryPage() {
               onSavePrediction={async () => { /* readonly */ }}
               showResult
               winners={winners[match.id]}
+              allPredictions={allPredictions[match.id]}
             />
           ))}
         </div>

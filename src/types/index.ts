@@ -68,6 +68,11 @@ export interface Standing {
   total_predictions: number;
   correct_predictions: number;
   accuracy: number;
+  // Points breakdown by category
+  points_winner?: number;      // +1 for correct winner (1/X/2)
+  points_halftime?: number;    // +2 for correct halftime score
+  points_difference?: number;  // +3 for correct goal difference
+  points_exact?: number;       // +4 for exact result
 }
 
 export interface Season {

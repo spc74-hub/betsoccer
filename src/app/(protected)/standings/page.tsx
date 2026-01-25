@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Standing, Season } from '@/types';
-import { Loader2, Trophy, Target, Percent, Info, History, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Trophy, Target, Percent, Info, History, Plus, ChevronDown, ChevronUp, ChevronRight, Award, Clock, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function StandingsPage() {
@@ -17,6 +17,7 @@ export default function StandingsPage() {
   const [showNewSeason, setShowNewSeason] = useState(false);
   const [newSeasonName, setNewSeasonName] = useState('');
   const [closing, setClosing] = useState(false);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchData() {
@@ -106,6 +107,18 @@ export default function StandingsPage() {
     });
   };
 
+  const toggleUserExpansion = (userId: string) => {
+    setExpandedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -186,50 +199,168 @@ export default function StandingsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {standings.map((standing, index) => (
-            <div
-              key={standing.user_id}
-              className={cn(
-                'flex items-center gap-4 p-4 rounded-xl border transition-all',
-                getRankStyle(index),
-                currentUserId === standing.user_id &&
-                'ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-950'
-              )}
-            >
-              {/* Rank */}
-              <div className="w-10 h-10 flex items-center justify-center text-xl font-bold">
-                {getRankEmoji(index)}
-              </div>
+          {standings.map((standing, index) => {
+            const isExpanded = expandedUsers.has(standing.user_id);
+            const hasBreakdown = standing.total_points > 0;
 
-              {/* User info */}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-white truncate">
-                  {standing.display_name}
-                  {currentUserId === standing.user_id && (
-                    <span className="ml-2 text-xs text-indigo-400">(tu)</span>
+            return (
+              <div key={standing.user_id}>
+                <div
+                  className={cn(
+                    'flex items-center gap-4 p-4 rounded-xl border transition-all',
+                    getRankStyle(index),
+                    currentUserId === standing.user_id &&
+                    'ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-950',
+                    hasBreakdown && 'cursor-pointer hover:brightness-110'
                   )}
-                </p>
-                <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <Target className="w-3 h-3" />
-                    {standing.correct_predictions}/{standing.total_predictions} aciertos
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Percent className="w-3 h-3" />
-                    {standing.accuracy}%
-                  </span>
-                </div>
-              </div>
+                  onClick={() => hasBreakdown && toggleUserExpansion(standing.user_id)}
+                >
+                  {/* Expand indicator */}
+                  {hasBreakdown && (
+                    <div className="w-6 flex items-center justify-center">
+                      <ChevronRight
+                        className={cn(
+                          'w-5 h-5 text-gray-400 transition-transform',
+                          isExpanded && 'rotate-90'
+                        )}
+                      />
+                    </div>
+                  )}
 
-              {/* Points */}
-              <div className="text-right">
-                <p className="text-2xl font-bold text-white">
-                  {standing.total_points}
-                </p>
-                <p className="text-xs text-gray-400">puntos</p>
+                  {/* Rank */}
+                  <div className={cn(
+                    'w-10 h-10 flex items-center justify-center text-xl font-bold',
+                    !hasBreakdown && 'ml-6'
+                  )}>
+                    {getRankEmoji(index)}
+                  </div>
+
+                  {/* User info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">
+                      {standing.display_name}
+                      {currentUserId === standing.user_id && (
+                        <span className="ml-2 text-xs text-indigo-400">(tu)</span>
+                      )}
+                    </p>
+                    <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Target className="w-3 h-3" />
+                        {standing.correct_predictions}/{standing.total_predictions} aciertos
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Percent className="w-3 h-3" />
+                        {standing.accuracy}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Points */}
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-white">
+                      {standing.total_points}
+                    </p>
+                    <p className="text-xs text-gray-400">puntos</p>
+                  </div>
+                </div>
+
+                {/* Points Breakdown - Expandable */}
+                {isExpanded && hasBreakdown && (
+                  <div className="mt-2 ml-6 p-4 bg-gray-900/80 rounded-lg border border-gray-700/50">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+                      <Award className="w-4 h-4" />
+                      Desglose de puntos
+                    </h4>
+                    <div className="space-y-3">
+                      {/* Winner points */}
+                      {(standing.points_winner || 0) > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400 flex items-center gap-2">
+                              <Trophy className="w-3.5 h-3.5 text-green-400" />
+                              Ganador (1/X/2)
+                            </span>
+                            <span className="text-green-400 font-medium">
+                              {standing.points_winner} pts
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-green-500 rounded-full"
+                              style={{ width: `${(standing.points_winner! / standing.total_points) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Halftime points */}
+                      {(standing.points_halftime || 0) > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400 flex items-center gap-2">
+                              <Clock className="w-3.5 h-3.5 text-blue-400" />
+                              Resultado descanso
+                            </span>
+                            <span className="text-blue-400 font-medium">
+                              {standing.points_halftime} pts
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full"
+                              style={{ width: `${(standing.points_halftime! / standing.total_points) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Difference points */}
+                      {(standing.points_difference || 0) > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400 flex items-center gap-2">
+                              <TrendingUp className="w-3.5 h-3.5 text-yellow-400" />
+                              Diferencia de goles
+                            </span>
+                            <span className="text-yellow-400 font-medium">
+                              {standing.points_difference} pts
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-yellow-500 rounded-full"
+                              style={{ width: `${(standing.points_difference! / standing.total_points) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Exact points */}
+                      {(standing.points_exact || 0) > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400 flex items-center gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+                              Resultado exacto
+                            </span>
+                            <span className="text-purple-400 font-medium">
+                              {standing.points_exact} pts
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-purple-500 rounded-full"
+                              style={{ width: `${(standing.points_exact! / standing.total_points) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -142,6 +142,7 @@ export default function StandingsPage() {
           )
         `)
         .eq('user_id', userId)
+        .eq('season_id', activeSeason?.id)
         .gt('points', 0)
         .order('created_at', { ascending: false });
 

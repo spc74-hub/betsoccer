@@ -14,6 +14,7 @@ export default function MatchesPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeSeasonId, setActiveSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [teamFilter, setTeamFilter] = useState<TeamFilterType>('all');
 
@@ -30,6 +31,17 @@ export default function MatchesPage() {
       if (!selectedUserId) {
         setSelectedUserId(user.id);
       }
+    }
+
+    // Fetch active season
+    const { data: activeSeason } = await supabase
+      .from('seasons')
+      .select('id')
+      .eq('is_active', true)
+      .single();
+
+    if (activeSeason) {
+      setActiveSeasonId(activeSeason.id);
     }
 
     // Fetch all users
@@ -127,6 +139,7 @@ export default function MatchesPage() {
           away_score: awayScore,
           home_score_halftime: homeScoreHalftime,
           away_score_halftime: awayScoreHalftime,
+          ...(activeSeasonId && { season_id: activeSeasonId }),
         },
         { onConflict: 'user_id,match_id' }
       )

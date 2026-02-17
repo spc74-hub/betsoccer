@@ -77,6 +77,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // Get active season
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('is_active', true)
+    .single();
+
   // Upsert prediction
   const { data, error } = await supabase
     .from('predictions')
@@ -86,6 +93,7 @@ export async function POST(request: Request) {
         match_id,
         home_score,
         away_score,
+        ...(activeSeason && { season_id: activeSeason.id }),
       },
       { onConflict: 'user_id,match_id' }
     )

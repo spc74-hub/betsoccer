@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -20,33 +20,30 @@ export default function ResetPasswordPage() {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError('Las contrasenas no coinciden');
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError('La contrasena debe tener al menos 6 caracteres');
       setLoading(false);
       return;
     }
 
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setMessage('Contraseña actualizada correctamente. Redirigiendo...');
+    try {
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ new_password: password }),
+      });
+      setMessage('Contrasena actualizada correctamente. Redirigiendo...');
       setTimeout(() => {
         router.push('/matches');
-        router.refresh();
       }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al actualizar');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,17 +52,17 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <span className="text-6xl">⚽</span>
+          <span className="text-6xl">&#9917;</span>
           <h1 className="text-3xl font-bold mt-4">BetSoccer</h1>
           <p className="text-gray-400 mt-2">
-            Establece tu nueva contraseña
+            Establece tu nueva contrasena
           </p>
         </div>
 
         {/* Reset form */}
         <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800">
           <h2 className="text-xl font-semibold mb-6 text-center">
-            Nueva contraseña
+            Nueva contrasena
           </h2>
 
           <form onSubmit={handleResetPassword} className="space-y-4">
@@ -74,7 +71,7 @@ export default function ResetPasswordPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-300 mb-2"
               >
-                Nueva contraseña
+                Nueva contrasena
               </label>
               <input
                 id="password"
@@ -93,7 +90,7 @@ export default function ResetPasswordPage() {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-gray-300 mb-2"
               >
-                Confirmar contraseña
+                Confirmar contrasena
               </label>
               <input
                 id="confirmPassword"
@@ -118,7 +115,7 @@ export default function ResetPasswordPage() {
                   Actualizando...
                 </>
               ) : (
-                'Guardar nueva contraseña'
+                'Guardar nueva contrasena'
               )}
             </button>
           </form>

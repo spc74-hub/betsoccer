@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Match } from '@/types';
-import { TeamStanding } from '@/lib/football-api';
+import { apiFetch } from '@/lib/api';
 import { formatMatchDate, formatMatchTime, cn } from '@/lib/utils';
 import {
   Loader2,
@@ -16,6 +16,24 @@ import {
 
 type ViewMode = 'matches' | 'standings';
 
+interface TeamStanding {
+  position: number;
+  team: {
+    id: number;
+    name: string;
+    shortName: string;
+    crest: string;
+  };
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+}
+
 export default function LaLigaPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [matches, setMatches] = useState<Partial<Match>[]>([]);
@@ -26,7 +44,6 @@ export default function LaLigaPage() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [expandedMatchday, setExpandedMatchday] = useState<string | null>(null);
 
-  // Load favorites from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('laliga-favorites');
     if (saved) {
@@ -34,7 +51,6 @@ export default function LaLigaPage() {
     }
   }, []);
 
-  // Save favorites to localStorage
   const toggleFavorite = (teamId: number) => {
     setFavorites((prev) => {
       const newFavorites = prev.includes(teamId)
@@ -45,18 +61,15 @@ export default function LaLigaPage() {
     });
   };
 
-  // Fetch data
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
         if (viewMode === 'matches') {
-          const res = await fetch(`/api/laliga?type=matches`);
-          const data = await res.json();
+          const data = await apiFetch<{ matches: Partial<Match>[] }>('/api/laliga?type=matches');
           setMatches(data.matches || []);
         } else {
-          const res = await fetch(`/api/laliga?type=standings`);
-          const data = await res.json();
+          const data = await apiFetch<{ standings: TeamStanding[] }>('/api/laliga?type=standings');
           setStandings(data.standings || []);
         }
       } catch (error) {
@@ -67,11 +80,7 @@ export default function LaLigaPage() {
     fetchData();
   }, [viewMode]);
 
-  // Separate and group matches into upcoming and played
   const { upcomingMatches, playedMatches } = useMemo(() => {
-    const now = new Date();
-
-    // Filter matches
     let filtered = matches;
 
     if (searchQuery) {
@@ -92,11 +101,9 @@ export default function LaLigaPage() {
       });
     }
 
-    // Separate into upcoming and played
     const upcoming = filtered.filter(m => m.status === 'SCHEDULED' || m.status === 'LIVE');
     const played = filtered.filter(m => m.status === 'FINISHED');
 
-    // Group by date helper
     const groupByDate = (matchList: Partial<Match>[]) => {
       const groups: Record<string, Partial<Match>[]> = {};
       matchList.forEach((match) => {
@@ -113,7 +120,6 @@ export default function LaLigaPage() {
       return groups;
     };
 
-    // Group upcoming (sorted ascending - nearest first)
     const upcomingGroups = groupByDate(upcoming);
     const sortedUpcoming = Object.entries(upcomingGroups).sort(([, a], [, b]) => {
       const dateA = new Date(a[0]?.kickoff_utc || '');
@@ -121,7 +127,6 @@ export default function LaLigaPage() {
       return dateA.getTime() - dateB.getTime();
     });
 
-    // Group played (sorted descending - most recent first)
     const playedGroups = groupByDate(played);
     const sortedPlayed = Object.entries(playedGroups).sort(([, a], [, b]) => {
       const dateA = new Date(a[0]?.kickoff_utc || '');
@@ -132,14 +137,12 @@ export default function LaLigaPage() {
     return { upcomingMatches: sortedUpcoming, playedMatches: sortedPlayed };
   }, [matches, searchQuery, showFavoritesOnly, favorites, standings]);
 
-  // Auto-expand first upcoming matchday
   useEffect(() => {
     if (upcomingMatches.length > 0 && !expandedMatchday) {
       setExpandedMatchday(upcomingMatches[0][0]);
     }
   }, [upcomingMatches, expandedMatchday]);
 
-  // Filter standings
   const filteredStandings = useMemo(() => {
     let filtered = standings;
 
@@ -160,7 +163,6 @@ export default function LaLigaPage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">LaLiga 24/25</h1>
         <p className="text-gray-400 mt-1">
@@ -168,11 +170,8 @@ export default function LaLigaPage() {
         </p>
       </div>
 
-      {/* Controls */}
       <div className="flex flex-col gap-4 mb-6">
-        {/* View toggles */}
         <div className="flex flex-wrap gap-3">
-          {/* View mode selector */}
           <div className="flex bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('matches')}
@@ -200,7 +199,6 @@ export default function LaLigaPage() {
             </button>
           </div>
 
-          {/* Favorites filter */}
           <button
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
             className={cn(
@@ -215,7 +213,6 @@ export default function LaLigaPage() {
           </button>
         </div>
 
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <input
@@ -228,17 +225,14 @@ export default function LaLigaPage() {
         </div>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center min-h-[40vh]">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
       )}
 
-      {/* Matches view */}
       {!loading && viewMode === 'matches' && (
         <div className="space-y-8">
-          {/* Upcoming matches section */}
           {upcomingMatches.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
@@ -267,7 +261,6 @@ export default function LaLigaPage() {
                       <div className="border-t border-gray-700 divide-y divide-gray-700">
                         {dayMatches.map((match) => {
                           const isLive = match.status === 'LIVE';
-
                           return (
                             <div key={match.external_id} className="p-4">
                               <div className="flex items-center justify-between">
@@ -307,7 +300,6 @@ export default function LaLigaPage() {
             </div>
           )}
 
-          {/* Played matches section */}
           {playedMatches.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-400 mb-4 flex items-center gap-2">
@@ -371,7 +363,6 @@ export default function LaLigaPage() {
         </div>
       )}
 
-      {/* Standings view */}
       {!loading && viewMode === 'standings' && (
         <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
           <div className="overflow-x-auto">
@@ -394,7 +385,6 @@ export default function LaLigaPage() {
               <tbody>
                 {filteredStandings.map((team) => {
                   const isFavorite = favorites.includes(team.team.id);
-
                   return (
                     <tr
                       key={team.team.id}
@@ -461,7 +451,6 @@ export default function LaLigaPage() {
             </table>
           </div>
 
-          {/* Legend */}
           <div className="p-4 border-t border-gray-700 flex flex-wrap gap-4 text-xs text-gray-400">
             <span className="flex items-center gap-2">
               <span className="w-3 h-3 rounded bg-green-600"></span> Champions League

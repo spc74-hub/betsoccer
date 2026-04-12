@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch } from '@/lib/api';
 import { Match, Prediction, User } from '@/types';
 import { formatMatchDate, formatMatchTime, isPredictionLocked, cn } from '@/lib/utils';
 import { Loader2, Clock, Lock, Check, RefreshCw, X, Trophy } from 'lucide-react';
@@ -22,20 +22,14 @@ export default function JornadaPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const response = await fetch('/api/sync', { method: 'POST' });
-      const data = await response.json();
-      if (response.ok) {
-        setSyncResult({
-          success: true,
-          message: `Sincronizado: ${data.stats.updated} actualizados, ${data.stats.created} nuevos`,
-        });
-        // Refresh the page data
-        window.location.reload();
-      } else {
-        setSyncResult({ success: false, message: data.error || 'Error al sincronizar' });
-      }
-    } catch {
-      setSyncResult({ success: false, message: 'Error de conexion' });
+      const data = await apiFetch<{ success: boolean; message: string; stats: { updated: number; created: number } }>('/api/sync', { method: 'POST' });
+      setSyncResult({
+        success: true,
+        message: `Sincronizado: ${data.stats.updated} actualizados, ${data.stats.created} nuevos`,
+      });
+      window.location.reload();
+    } catch (err) {
+      setSyncResult({ success: false, message: err instanceof Error ? err.message : 'Error al sincronizar' });
     } finally {
       setSyncing(false);
     }
@@ -43,74 +37,47 @@ export default function JornadaPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const supabase = createClient();
-
-      // Fetch all users
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('display_name');
-
-      if (usersData) {
+      try {
+        // Fetch all users
+        const usersData = await apiFetch<User[]>('/api/users');
         setUsers(usersData);
+
+        // Fetch upcoming matches
+        const upcomingData = await apiFetch<Match[]>('/api/matches?status=upcoming');
+        const upcomingLimited = upcomingData.slice(0, 10);
+
+        // Fetch finished matches (last 7 days)
+        const finishedData = await apiFetch<Match[]>('/api/matches?status=finished');
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const recentFinished = finishedData
+          .filter((m) => new Date(m.kickoff_utc) >= sevenDaysAgo)
+          .sort((a, b) => new Date(b.kickoff_utc).getTime() - new Date(a.kickoff_utc).getTime())
+          .slice(0, 10);
+
+        const allMatches = [...upcomingLimited, ...recentFinished];
+
+        if (allMatches.length > 0) {
+          const matchIds = allMatches.map((m) => m.id).join(',');
+          const predictionsData = await apiFetch<Prediction[]>(`/api/predictions?match_ids=${matchIds}`);
+
+          const processMatches = (matchList: Match[]): MatchWithAllPredictions[] =>
+            matchList.map((match) => {
+              const matchPredictions: Record<string, Prediction> = {};
+              predictionsData.forEach((p) => {
+                if (p.match_id === match.id) {
+                  matchPredictions[p.user_id] = p;
+                }
+              });
+              return { ...match, predictions: matchPredictions };
+            });
+
+          setUpcomingMatches(processMatches(upcomingLimited));
+          setFinishedMatches(processMatches(recentFinished));
+        }
+      } catch (err) {
+        console.error('Error fetching data:', err);
       }
-
-      // Fetch upcoming matches
-      const { data: upcomingData } = await supabase
-        .from('matches')
-        .select('*')
-        .in('status', ['SCHEDULED', 'LIVE'])
-        .order('kickoff_utc', { ascending: true })
-        .limit(10);
-
-      // Fetch recently finished matches (last 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const { data: finishedData } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'FINISHED')
-        .gte('kickoff_utc', sevenDaysAgo.toISOString())
-        .order('kickoff_utc', { ascending: false })
-        .limit(10);
-
-      const allMatches = [...(upcomingData || []), ...(finishedData || [])];
-
-      if (allMatches.length > 0) {
-        // Fetch all predictions for these matches
-        const matchIds = allMatches.map((m) => m.id);
-        const { data: predictionsData } = await supabase
-          .from('predictions')
-          .select('*')
-          .in('match_id', matchIds);
-
-        // Process upcoming matches
-        const upcoming: MatchWithAllPredictions[] = (upcomingData || []).map((match) => {
-          const matchPredictions: Record<string, Prediction> = {};
-          predictionsData?.forEach((p) => {
-            if (p.match_id === match.id) {
-              matchPredictions[p.user_id] = p;
-            }
-          });
-          return { ...match, predictions: matchPredictions };
-        });
-
-        // Process finished matches
-        const finished: MatchWithAllPredictions[] = (finishedData || []).map((match) => {
-          const matchPredictions: Record<string, Prediction> = {};
-          predictionsData?.forEach((p) => {
-            if (p.match_id === match.id) {
-              matchPredictions[p.user_id] = p;
-            }
-          });
-          return { ...match, predictions: matchPredictions };
-        });
-
-        setUpcomingMatches(upcoming);
-        setFinishedMatches(finished);
-      }
-
       setLoading(false);
     }
 
@@ -125,7 +92,6 @@ export default function JornadaPage() {
     );
   }
 
-  // Helper to get total points
   const getTotalPoints = (prediction: Prediction): number => {
     return (prediction.points_winner ?? 0) +
            (prediction.points_halftime ?? 0) +
@@ -384,7 +350,6 @@ export default function JornadaPage() {
                       const totalPoints = hasPrediction ? getTotalPoints(prediction) : 0;
                       const hasPoints = totalPoints > 0;
 
-                      // Calculate what user got right/wrong
                       const getWinnerType = (home: number, away: number) => home > away ? '1' : home < away ? '2' : 'X';
                       const matchWinner = match.home_score != null && match.away_score != null
                         ? getWinnerType(match.home_score as number, match.away_score as number) : null;
@@ -405,7 +370,6 @@ export default function JornadaPage() {
                               : 'bg-gray-900/50'
                           )}
                         >
-                          {/* Header with name and total points */}
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-white">
@@ -429,7 +393,6 @@ export default function JornadaPage() {
                             )}
                           </div>
 
-                          {/* Points breakdown */}
                           {hasPrediction ? (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-[10px]">
                               <div className={cn(
@@ -458,11 +421,11 @@ export default function JornadaPage() {
                                 prediction.points_exact ? 'bg-green-600/30 text-green-300' : 'bg-gray-800/50 text-gray-500'
                               )}>
                                 <span>EXACTO</span>
-                                <span>{prediction.points_exact ? '+4' : '✗'}</span>
+                                <span>{prediction.points_exact ? '+4' : '\u2717'}</span>
                               </div>
                             </div>
                           ) : (
-                            <span className="text-gray-500 text-xs">Sin pronóstico</span>
+                            <span className="text-gray-500 text-xs">Sin pronostico</span>
                           )}
                         </div>
                       );

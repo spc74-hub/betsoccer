@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { apiFetch, getUser } from '@/lib/api';
 import { Match, Prediction, TeamFilter as TeamFilterType, User } from '@/types';
 import { MatchCard } from '@/components/MatchCard';
 import { TeamFilter } from '@/components/TeamFilter';
@@ -34,110 +34,85 @@ export default function HistoryPage() {
   const [teamFilter, setTeamFilter] = useState<TeamFilterType>('all');
 
   const fetchData = useCallback(async () => {
-    const supabase = createClient();
+    const currentUser = getUser();
 
-    // Fetch all users first
-    const { data: usersData } = await supabase
-      .from('users')
-      .select('*');
-
-    const usersMap: Record<string, User> = {};
-    usersData?.forEach((u) => {
-      usersMap[u.id] = u;
-    });
-
-    // Fetch finished matches
-    let matchQuery = supabase
-      .from('matches')
-      .select('*')
-      .eq('status', 'FINISHED')
-      .order('kickoff_utc', { ascending: false })
-      .limit(50);
-
-    if (teamFilter === 'real-madrid') {
-      matchQuery = matchQuery.or(
-        'home_team.ilike.%Real Madrid%,away_team.ilike.%Real Madrid%'
-      );
-    } else if (teamFilter === 'barcelona') {
-      matchQuery = matchQuery.or(
-        'home_team.ilike.%Barcelona%,away_team.ilike.%Barcelona%'
-      );
-    }
-
-    const { data: matchesData } = await matchQuery;
-
-    // Fetch user predictions
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user && matchesData) {
-      const matchIds = matchesData.map((m) => m.id);
-
-      // Fetch current user's predictions
-      const { data: predictionsData } = await supabase
-        .from('predictions')
-        .select('*')
-        .eq('user_id', user.id)
-        .in('match_id', matchIds);
-
-      const predictionsMap: Record<string, Prediction> = {};
-      predictionsData?.forEach((p) => {
-        predictionsMap[p.match_id] = p;
+    try {
+      // Fetch all users
+      const usersData = await apiFetch<User[]>('/api/users');
+      const usersMap: Record<string, User> = {};
+      usersData.forEach((u) => {
+        usersMap[u.id] = u;
       });
-      setPredictions(predictionsMap);
 
-      // Fetch ALL predictions for these matches
-      const { data: allPredictionsData } = await supabase
-        .from('predictions')
-        .select('*')
-        .in('match_id', matchIds);
+      // Fetch finished matches
+      let url = '/api/matches?status=finished';
+      if (teamFilter !== 'all') {
+        url += `&team=${teamFilter}`;
+      }
+      let matchesData = await apiFetch<Match[]>(url);
+      // Sort descending and limit
+      matchesData = matchesData
+        .sort((a, b) => new Date(b.kickoff_utc).getTime() - new Date(a.kickoff_utc).getTime())
+        .slice(0, 50);
 
-      // Build winners map and predictions details map
-      const winnersMap: Record<string, WinnerInfo[]> = {};
-      const allPredictionsMap: Record<string, PredictionDetail[]> = {};
+      if (currentUser && matchesData.length > 0) {
+        const matchIds = matchesData.map((m) => m.id).join(',');
 
-      allPredictionsData?.forEach((p) => {
-        const userName = usersMap[p.user_id]?.display_name || 'Usuario';
+        // Fetch current user predictions
+        const predictionsData = await apiFetch<Prediction[]>(
+          `/api/predictions?user_id=${currentUser.id}&match_ids=${matchIds}`
+        );
+        const predictionsMap: Record<string, Prediction> = {};
+        predictionsData.forEach((p) => {
+          predictionsMap[p.match_id] = p;
+        });
+        setPredictions(predictionsMap);
 
-        // Winners map (for simple display)
-        if (!winnersMap[p.match_id]) {
-          winnersMap[p.match_id] = [];
-        }
-        winnersMap[p.match_id].push({
-          name: userName,
-          points: p.points ?? 0,
+        // Fetch ALL predictions for these matches
+        const allPredictionsData = await apiFetch<Prediction[]>(
+          `/api/predictions?match_ids=${matchIds}`
+        );
+
+        const winnersMap: Record<string, WinnerInfo[]> = {};
+        const allPredictionsMap: Record<string, PredictionDetail[]> = {};
+
+        allPredictionsData.forEach((p) => {
+          const userName = usersMap[p.user_id]?.display_name || 'Usuario';
+
+          if (!winnersMap[p.match_id]) winnersMap[p.match_id] = [];
+          winnersMap[p.match_id].push({
+            name: userName,
+            points: p.points ?? 0,
+          });
+
+          if (!allPredictionsMap[p.match_id]) allPredictionsMap[p.match_id] = [];
+          allPredictionsMap[p.match_id].push({
+            user_name: userName,
+            home_score: p.home_score,
+            away_score: p.away_score,
+            home_score_halftime: p.home_score_halftime,
+            away_score_halftime: p.away_score_halftime,
+            points: p.points ?? 0,
+            points_winner: p.points_winner,
+            points_halftime: p.points_halftime,
+            points_difference: p.points_difference,
+            points_exact: p.points_exact,
+          });
         });
 
-        // Predictions details map (for expanded view)
-        if (!allPredictionsMap[p.match_id]) {
-          allPredictionsMap[p.match_id] = [];
-        }
-        allPredictionsMap[p.match_id].push({
-          user_name: userName,
-          home_score: p.home_score,
-          away_score: p.away_score,
-          home_score_halftime: p.home_score_halftime,
-          away_score_halftime: p.away_score_halftime,
-          points: p.points ?? 0,
-          points_winner: p.points_winner,
-          points_halftime: p.points_halftime,
-          points_difference: p.points_difference,
-          points_exact: p.points_exact,
+        Object.keys(winnersMap).forEach((matchId) => {
+          winnersMap[matchId].sort((a, b) => b.points - a.points);
+          allPredictionsMap[matchId].sort((a, b) => b.points - a.points);
         });
-      });
 
-      // Sort both maps by points descending
-      Object.keys(winnersMap).forEach((matchId) => {
-        winnersMap[matchId].sort((a, b) => b.points - a.points);
-        allPredictionsMap[matchId].sort((a, b) => b.points - a.points);
-      });
+        setWinners(winnersMap);
+        setAllPredictions(allPredictionsMap);
+      }
 
-      setWinners(winnersMap);
-      setAllPredictions(allPredictionsMap);
+      setMatches(matchesData);
+    } catch (err) {
+      console.error('Error fetching history:', err);
     }
-
-    setMatches(matchesData || []);
     setLoading(false);
   }, [teamFilter]);
 
@@ -145,10 +120,9 @@ export default function HistoryPage() {
     fetchData();
   }, [fetchData]);
 
-  // Calculate stats
   const predictedMatches = Object.keys(predictions).length;
   const correctPredictions = Object.values(predictions).filter(
-    (p) => p.points === 1
+    (p) => (p.points ?? 0) > 0
   ).length;
   const accuracy =
     predictedMatches > 0
@@ -169,13 +143,12 @@ export default function HistoryPage() {
         <div>
           <h1 className="text-2xl font-bold">Historial</h1>
           <p className="text-gray-400 mt-1">
-            Revisa tus pronósticos pasados y resultados
+            Revisa tus pronosticos pasados y resultados
           </p>
         </div>
         <TeamFilter value={teamFilter} onChange={setTeamFilter} />
       </div>
 
-      {/* Personal stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
           <p className="text-sm text-gray-400">Partidos pronosticados</p>
@@ -188,7 +161,7 @@ export default function HistoryPage() {
           </p>
         </div>
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <p className="text-sm text-gray-400">Precisión</p>
+          <p className="text-sm text-gray-400">Precision</p>
           <p className="text-2xl font-bold text-white mt-1">{accuracy}%</p>
         </div>
       </div>
@@ -198,7 +171,7 @@ export default function HistoryPage() {
           <History className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">No hay partidos finalizados</p>
           <p className="text-gray-500 text-sm mt-1">
-            Aquí aparecerán los resultados de los partidos
+            Aqui apareceran los resultados de los partidos
           </p>
         </div>
       ) : (

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Match, Prediction, TeamFilter as TeamFilterType, User } from '@/types';
+import { apiFetch, getUser } from '@/lib/api';
+import { Match, Prediction, TeamFilter as TeamFilterType, User, Season } from '@/types';
 import { MatchCard } from '@/components/MatchCard';
 import { TeamFilter } from '@/components/TeamFilter';
 import { Loader2, RefreshCw, Users } from 'lucide-react';
@@ -19,77 +19,51 @@ export default function MatchesPage() {
   const [teamFilter, setTeamFilter] = useState<TeamFilterType>('all');
 
   const fetchData = useCallback(async () => {
-    const supabase = createClient();
-
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      setCurrentUserId(user.id);
+    const currentUser = getUser();
+    if (currentUser) {
+      setCurrentUserId(currentUser.id);
       if (!selectedUserId) {
-        setSelectedUserId(user.id);
+        setSelectedUserId(currentUser.id);
       }
     }
 
-    // Fetch active season
-    const { data: activeSeason } = await supabase
-      .from('seasons')
-      .select('id')
-      .eq('is_active', true)
-      .single();
+    try {
+      // Fetch active season
+      const seasons = await apiFetch<Season[]>('/api/standings/seasons');
+      const activeSeason = seasons.find((s) => s.is_active);
+      if (activeSeason) {
+        setActiveSeasonId(activeSeason.id);
+      }
 
-    if (activeSeason) {
-      setActiveSeasonId(activeSeason.id);
-    }
-
-    // Fetch all users
-    const { data: usersData } = await supabase
-      .from('users')
-      .select('*')
-      .order('display_name');
-
-    if (usersData) {
+      // Fetch all users
+      const usersData = await apiFetch<User[]>('/api/users');
       setUsers(usersData);
+
+      // Fetch matches
+      let url = '/api/matches?status=upcoming';
+      if (teamFilter !== 'all') {
+        url += `&team=${teamFilter}`;
+      }
+      const matchesData = await apiFetch<Match[]>(url);
+
+      // Fetch predictions for selected user
+      const targetUserId = selectedUserId || currentUser?.id;
+      if (targetUserId && matchesData.length > 0) {
+        const matchIds = matchesData.map((m) => m.id).join(',');
+        const predictionsData = await apiFetch<Prediction[]>(
+          `/api/predictions?user_id=${targetUserId}&match_ids=${matchIds}`
+        );
+        const predictionsMap: Record<string, Prediction> = {};
+        predictionsData.forEach((p) => {
+          predictionsMap[p.match_id] = p;
+        });
+        setPredictions(predictionsMap);
+      }
+
+      setMatches(matchesData);
+    } catch (err) {
+      console.error('Error fetching data:', err);
     }
-
-    // Fetch matches
-    let matchQuery = supabase
-      .from('matches')
-      .select('*')
-      .in('status', ['SCHEDULED', 'LIVE'])
-      .order('kickoff_utc', { ascending: true });
-
-    if (teamFilter === 'real-madrid') {
-      matchQuery = matchQuery.or(
-        'home_team.ilike.%Real Madrid%,away_team.ilike.%Real Madrid%'
-      );
-    } else if (teamFilter === 'barcelona') {
-      matchQuery = matchQuery.or(
-        'home_team.ilike.%Barcelona%,away_team.ilike.%Barcelona%'
-      );
-    }
-
-    const { data: matchesData } = await matchQuery;
-
-    // Fetch predictions for selected user
-    if (selectedUserId && matchesData) {
-      const matchIds = matchesData.map((m) => m.id);
-      const { data: predictionsData } = await supabase
-        .from('predictions')
-        .select('*')
-        .eq('user_id', selectedUserId)
-        .in('match_id', matchIds);
-
-      const predictionsMap: Record<string, Prediction> = {};
-      predictionsData?.forEach((p) => {
-        predictionsMap[p.match_id] = p;
-      });
-      setPredictions(predictionsMap);
-    }
-
-    setMatches(matchesData || []);
     setLoading(false);
   }, [teamFilter, selectedUserId]);
 
@@ -101,20 +75,19 @@ export default function MatchesPage() {
     setSelectedUserId(userId);
     setLoading(true);
 
-    const supabase = createClient();
-    const matchIds = matches.map((m) => m.id);
-
-    const { data: predictionsData } = await supabase
-      .from('predictions')
-      .select('*')
-      .eq('user_id', userId)
-      .in('match_id', matchIds);
-
-    const predictionsMap: Record<string, Prediction> = {};
-    predictionsData?.forEach((p) => {
-      predictionsMap[p.match_id] = p;
-    });
-    setPredictions(predictionsMap);
+    try {
+      const matchIds = matches.map((m) => m.id).join(',');
+      const predictionsData = await apiFetch<Prediction[]>(
+        `/api/predictions?user_id=${userId}&match_ids=${matchIds}`
+      );
+      const predictionsMap: Record<string, Prediction> = {};
+      predictionsData.forEach((p) => {
+        predictionsMap[p.match_id] = p;
+      });
+      setPredictions(predictionsMap);
+    } catch (err) {
+      console.error('Error fetching predictions:', err);
+    }
     setLoading(false);
   };
 
@@ -127,30 +100,25 @@ export default function MatchesPage() {
   ) => {
     if (!selectedUserId) return;
 
-    const supabase = createClient();
-
-    const { data, error } = await supabase
-      .from('predictions')
-      .upsert(
-        {
+    try {
+      const data = await apiFetch<Prediction>('/api/predictions', {
+        method: 'POST',
+        body: JSON.stringify({
           user_id: selectedUserId,
           match_id: matchId,
           home_score: homeScore,
           away_score: awayScore,
           home_score_halftime: homeScoreHalftime,
           away_score_halftime: awayScoreHalftime,
-          ...(activeSeasonId && { season_id: activeSeasonId }),
-        },
-        { onConflict: 'user_id,match_id' }
-      )
-      .select()
-      .single();
+        }),
+      });
 
-    if (!error && data) {
       setPredictions((prev) => ({
         ...prev,
         [matchId]: data,
       }));
+    } catch (err) {
+      console.error('Error saving prediction:', err);
     }
   };
 
@@ -169,9 +137,9 @@ export default function MatchesPage() {
       <div className="flex flex-col gap-4 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Próximos partidos</h1>
+            <h1 className="text-2xl font-bold">Proximos partidos</h1>
             <p className="text-gray-400 mt-1">
-              Haz tu pronóstico antes de que empiece el partido
+              Haz tu pronostico antes de que empiece el partido
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -193,7 +161,7 @@ export default function MatchesPage() {
         {users.length > 1 && (
           <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
             <Users className="w-5 h-5 text-gray-400" />
-            <span className="text-sm text-gray-400">Editando pronósticos de:</span>
+            <span className="text-sm text-gray-400">Editando pronosticos de:</span>
             <div className="flex gap-2">
               {users.map((user) => (
                 <button
@@ -207,7 +175,7 @@ export default function MatchesPage() {
                   )}
                 >
                   {user.display_name}
-                  {user.id === currentUserId && ' (tú)'}
+                  {user.id === currentUserId && ' (tu)'}
                 </button>
               ))}
             </div>
@@ -217,7 +185,7 @@ export default function MatchesPage() {
         {selectedUser && selectedUserId !== currentUserId && (
           <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
             <p className="text-sm text-yellow-400">
-              Estás editando los pronósticos de <strong>{selectedUser.display_name}</strong>
+              Estas editando los pronosticos de <strong>{selectedUser.display_name}</strong>
             </p>
           </div>
         )}
@@ -225,9 +193,9 @@ export default function MatchesPage() {
 
       {matches.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400">No hay partidos próximos</p>
+          <p className="text-gray-400">No hay partidos proximos</p>
           <p className="text-gray-500 text-sm mt-1">
-            Los partidos se cargarán automáticamente
+            Los partidos se cargaran automaticamente
           </p>
         </div>
       ) : (

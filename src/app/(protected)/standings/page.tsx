@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Standing, Season } from '@/types';
+import { apiFetch, getUser } from '@/lib/api';
+import { Standing, Season, Prediction } from '@/types';
 import { Loader2, Trophy, Target, Percent, Info, History, Plus, ChevronDown, ChevronUp, ChevronRight, Award, Clock, TrendingUp, CheckCircle2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,34 +22,23 @@ export default function StandingsPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const user = getUser();
       if (user) {
         setCurrentUserId(user.id);
       }
 
-      // Fetch standings
-      const { data: standingsData } = await supabase
-        .from('standings')
-        .select('*')
-        .order('total_points', { ascending: false });
+      try {
+        const [standingsData, seasonsData] = await Promise.all([
+          apiFetch<Standing[]>('/api/standings'),
+          apiFetch<Season[]>('/api/standings/seasons'),
+        ]);
 
-      setStandings(standingsData || []);
-
-      // Fetch seasons
-      const { data: seasonsData } = await supabase
-        .from('seasons')
-        .select('*')
-        .order('start_date', { ascending: false });
-
-      if (seasonsData) {
+        setStandings(standingsData);
         setSeasons(seasonsData);
         const active = seasonsData.find((s) => s.is_active);
         setActiveSeason(active || null);
+      } catch (err) {
+        console.error('Error fetching standings:', err);
       }
 
       setLoading(false);
@@ -62,19 +51,15 @@ export default function StandingsPage() {
     if (!newSeasonName.trim()) return;
 
     setClosing(true);
-    const supabase = createClient();
-
-    const { data, error } = await supabase.rpc('close_season_and_start_new', {
-      new_season_name: newSeasonName.trim(),
-    });
-
-    if (!error && data) {
-      // Refresh page
+    try {
+      await apiFetch('/api/standings/close-season', {
+        method: 'POST',
+        body: JSON.stringify({ new_season_name: newSeasonName.trim() }),
+      });
       window.location.reload();
-    } else {
-      alert('Error al cerrar temporada: ' + (error?.message || 'Unknown error'));
+    } catch (err) {
+      alert('Error al cerrar temporada: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
-
     setClosing(false);
   };
 
@@ -94,9 +79,9 @@ export default function StandingsPage() {
   };
 
   const getRankEmoji = (index: number) => {
-    if (index === 0) return '🥇';
-    if (index === 1) return '🥈';
-    if (index === 2) return '🥉';
+    if (index === 0) return '\uD83E\uDD47';
+    if (index === 1) return '\uD83E\uDD48';
+    if (index === 2) return '\uD83E\uDD49';
     return `${index + 1}`;
   };
 
@@ -121,36 +106,17 @@ export default function StandingsPage() {
       return newSet;
     });
 
-    // Load predictions if expanding and not already loaded
-    if (!isCurrentlyExpanded && !userPredictions[userId]) {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('predictions')
-        .select(`
-          *,
-          match:matches(
-            id,
-            home_team,
-            away_team,
-            home_team_logo,
-            away_team_logo,
-            home_score,
-            away_score,
-            home_score_halftime,
-            away_score_halftime,
-            kickoff_utc
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('season_id', activeSeason?.id)
-        .gt('points', 0)
-        .order('created_at', { ascending: false });
-
-      if (data) {
+    if (!isCurrentlyExpanded && !userPredictions[userId] && activeSeason) {
+      try {
+        const data = await apiFetch<any[]>(
+          `/api/predictions?user_id=${userId}&season_id=${activeSeason.id}&has_points=true`
+        );
         setUserPredictions(prev => ({
           ...prev,
-          [userId]: data
+          [userId]: data,
         }));
+      } catch (err) {
+        console.error('Error fetching user predictions:', err);
       }
     }
   };
@@ -251,7 +217,6 @@ export default function StandingsPage() {
                   )}
                   onClick={() => hasBreakdown && toggleUserExpansion(standing.user_id)}
                 >
-                  {/* Expand indicator */}
                   {hasBreakdown && (
                     <div className="w-6 flex items-center justify-center">
                       <ChevronRight
@@ -263,7 +228,6 @@ export default function StandingsPage() {
                     </div>
                   )}
 
-                  {/* Rank */}
                   <div className={cn(
                     'w-10 h-10 flex items-center justify-center text-xl font-bold',
                     !hasBreakdown && 'ml-6'
@@ -271,7 +235,6 @@ export default function StandingsPage() {
                     {getRankEmoji(index)}
                   </div>
 
-                  {/* User info */}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-white truncate">
                       {standing.display_name}
@@ -291,7 +254,6 @@ export default function StandingsPage() {
                     </div>
                   </div>
 
-                  {/* Points */}
                   <div className="text-right">
                     <p className="text-2xl font-bold text-white">
                       {standing.total_points}
@@ -300,17 +262,14 @@ export default function StandingsPage() {
                   </div>
                 </div>
 
-                {/* Points Breakdown - Expandable */}
                 {isExpanded && hasBreakdown && (
                   <div className="mt-2 ml-6 p-4 bg-gray-900/80 rounded-lg border border-gray-700/50 space-y-4">
-                    {/* Summary by category */}
                     <div>
                       <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
                         <Award className="w-4 h-4" />
-                        Resumen por categoría
+                        Resumen por categoria
                       </h4>
                       <div className="space-y-3">
-                        {/* Winner points */}
                         {(standing.points_winner || 0) > 0 && (
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
@@ -330,8 +289,6 @@ export default function StandingsPage() {
                             </div>
                           </div>
                         )}
-
-                        {/* Halftime points */}
                         {(standing.points_halftime || 0) > 0 && (
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
@@ -351,8 +308,6 @@ export default function StandingsPage() {
                             </div>
                           </div>
                         )}
-
-                        {/* Difference points */}
                         {(standing.points_difference || 0) > 0 && (
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
@@ -372,8 +327,6 @@ export default function StandingsPage() {
                             </div>
                           </div>
                         )}
-
-                        {/* Exact points */}
                         {(standing.points_exact || 0) > 0 && (
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
@@ -396,7 +349,6 @@ export default function StandingsPage() {
                       </div>
                     </div>
 
-                    {/* Match-by-match breakdown */}
                     {userPredictions[standing.user_id] && userPredictions[standing.user_id].length > 0 && (
                       <div className="pt-4 border-t border-gray-700">
                         <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
@@ -409,11 +361,10 @@ export default function StandingsPage() {
                               key={pred.id}
                               className="p-3 bg-gray-800/60 rounded-lg border border-gray-700/50"
                             >
-                              {/* Match info */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 text-xs text-gray-400">
                                   <span>
-                                    {new Date(pred.match.kickoff_utc).toLocaleDateString('es-ES', {
+                                    {new Date(pred.created_at).toLocaleDateString('es-ES', {
                                       day: 'numeric',
                                       month: 'short'
                                     })}
@@ -424,30 +375,8 @@ export default function StandingsPage() {
                                 </span>
                               </div>
 
-                              {/* Teams and scores */}
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <span className="text-sm text-white truncate">
-                                    {pred.match.home_team}
-                                  </span>
-                                  <span className="text-xs font-bold text-gray-300">
-                                    {pred.match.home_score}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-gray-500 px-2">vs</span>
-                                <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                                  <span className="text-xs font-bold text-gray-300">
-                                    {pred.match.away_score}
-                                  </span>
-                                  <span className="text-sm text-white truncate">
-                                    {pred.match.away_team}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Prediction */}
                               <div className="text-xs text-gray-400 mb-2">
-                                Tu predicción: {pred.home_score}-{pred.away_score}
+                                Prediccion: {pred.home_score}-{pred.away_score}
                                 {pred.home_score_halftime !== null && pred.home_score_halftime !== 0 && (
                                   <span className="ml-2">
                                     (HT: {pred.home_score_halftime}-{pred.away_score_halftime})
@@ -455,7 +384,6 @@ export default function StandingsPage() {
                                 )}
                               </div>
 
-                              {/* Points breakdown for this match */}
                               <div className="flex flex-wrap gap-2">
                                 {pred.points_winner > 0 && (
                                   <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
@@ -523,7 +451,6 @@ export default function StandingsPage() {
 
       {/* Season management */}
       <div className="mt-8 space-y-4">
-        {/* History toggle */}
         <button
           onClick={() => setShowHistory(!showHistory)}
           className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-xl border border-gray-700 transition-colors"
@@ -545,15 +472,12 @@ export default function StandingsPage() {
               <p className="text-gray-500 text-sm py-2">No hay temporadas registradas</p>
             ) : (
               seasons.map((season) => (
-                <SeasonCard
-                  key={season.id}
-                  season={season}
-                />
+                <SeasonCard key={season.id} season={season} />
               ))
-            )}\n          </div>
+            )}
+          </div>
         )}
 
-        {/* New season button */}
         <button
           onClick={() => setShowNewSeason(!showNewSeason)}
           className="flex items-center justify-between w-full p-4 bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors"
@@ -626,7 +550,6 @@ export default function StandingsPage() {
   );
 }
 
-// Season card component with expandable standings
 function SeasonCard({ season }: { season: Season }) {
   const [expanded, setExpanded] = useState(false);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -641,19 +564,17 @@ function SeasonCard({ season }: { season: Season }) {
   };
 
   const loadStandings = async () => {
-    if (standings.length > 0) return; // Already loaded
+    if (standings.length > 0) return;
 
     setLoading(true);
-    const supabase = createClient();
-
-    const { data } = await supabase
-      .from('standings_by_season')
-      .select('*')
-      .eq('season_id', season.id)
-      .gt('total_predictions', 0)
-      .order('total_points', { ascending: false });
-
-    setStandings(data || []);
+    try {
+      const data = await apiFetch<Standing[]>(
+        `/api/standings/by-season?season_id=${season.id}`
+      );
+      setStandings(data.filter((s) => s.total_predictions > 0));
+    } catch (err) {
+      console.error('Error loading season standings:', err);
+    }
     setLoading(false);
   };
 
@@ -696,7 +617,7 @@ function SeasonCard({ season }: { season: Season }) {
           <div className="flex items-center gap-2">
             {season.winner_user_id && !season.is_active && (
               <span className="text-sm text-yellow-400 font-medium">
-                🏆 {season.winner_name}
+                \uD83C\uDFC6 {season.winner_name}
               </span>
             )}
             <span className="text-gray-400">
@@ -718,7 +639,7 @@ function SeasonCard({ season }: { season: Season }) {
             </p>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs text-gray-400 mb-2">Clasificación final:</p>
+              <p className="text-xs text-gray-400 mb-2">Clasificacion final:</p>
               {standings.map((standing, idx) => (
                 <div
                   key={standing.user_id}
@@ -732,7 +653,7 @@ function SeasonCard({ season }: { season: Season }) {
                       'text-sm font-bold w-5',
                       idx === 0 ? 'text-yellow-400' : 'text-gray-400'
                     )}>
-                      {idx === 0 ? '🥇' : `${idx + 1}.`}
+                      {idx === 0 ? '\uD83E\uDD47' : `${idx + 1}.`}
                     </span>
                     <span className="text-sm text-white">{standing.display_name}</span>
                   </div>

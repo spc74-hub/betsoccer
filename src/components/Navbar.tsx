@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { removeToken } from '@/lib/api';
 import {
   Calendar,
   Trophy,
@@ -30,9 +30,8 @@ export function Navbar() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+  const handleSignOut = () => {
+    removeToken();
     router.push('/login');
   };
 
@@ -42,7 +41,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/matches" className="flex items-center gap-2">
-            <span className="text-2xl">⚽</span>
+            <span className="text-2xl">&#9917;</span>
             <span className="font-bold text-xl text-white">BetSoccer</span>
           </Link>
 

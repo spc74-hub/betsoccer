@@ -1,0 +1,28 @@
+services:
+  betsoccer-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: betsoccer-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    networks:
+      - spcapps-network
+
+  betsoccer-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://betsoccer.spcapps.com
+    container_name: betsoccer-frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://betsoccer.spcapps.com
+    networks:
+      - spcapps-network
+
+networks:
+  spcapps-network:
+    external: true

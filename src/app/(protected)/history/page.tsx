@@ -93,10 +93,10 @@ export default function HistoryPage() {
             home_score_halftime: p.home_score_halftime,
             away_score_halftime: p.away_score_halftime,
             points: p.points ?? 0,
-            points_winner: p.points_winner,
-            points_halftime: p.points_halftime,
-            points_difference: p.points_difference,
-            points_exact: p.points_exact,
+            points_winner: p.points_winner ?? null,
+            points_halftime: p.points_halftime ?? null,
+            points_difference: p.points_difference ?? null,
+            points_exact: p.points_exact ?? null,
           });
         });
 

@@ -3,6 +3,7 @@ Football API integrations - ported from src/lib/football-api.ts and src/lib/api-
 Uses football-data.org (free tier) as primary and api-football as fallback.
 """
 
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -44,8 +45,15 @@ STATUS_MAP_AF = {
 }
 
 
+def _parse_utc(date_str: str) -> datetime:
+    """Parse ISO date string to timezone-aware datetime."""
+    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _get_current_season() -> int:
-    from datetime import datetime
     now = datetime.utcnow()
     return now.year - 1 if now.month < 7 else now.year
 
@@ -75,7 +83,7 @@ async def _fd_fetch_team_matches(client: httpx.AsyncClient, team_id: int) -> lis
             "home_team_logo": m["homeTeam"].get("crest"),
             "away_team": m["awayTeam"]["name"],
             "away_team_logo": m["awayTeam"].get("crest"),
-            "kickoff_utc": m["utcDate"],
+            "kickoff_utc": _parse_utc(m["utcDate"]),
             "venue": m.get("venue"),
             "status": STATUS_MAP_FD.get(m["status"], "SCHEDULED"),
             "home_score": m["score"]["fullTime"]["home"],
@@ -124,7 +132,7 @@ async def fetch_competition_matches(competition_id: str) -> list[dict]:
             "home_team_logo": m["homeTeam"].get("crest"),
             "away_team": m["awayTeam"]["name"],
             "away_team_logo": m["awayTeam"].get("crest"),
-            "kickoff_utc": m["utcDate"],
+            "kickoff_utc": _parse_utc(m["utcDate"]),
             "venue": m.get("venue"),
             "status": STATUS_MAP_FD.get(m["status"], "SCHEDULED"),
             "home_score": m["score"]["fullTime"]["home"],

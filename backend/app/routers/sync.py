@@ -60,6 +60,7 @@ async def sync_matches(
                 or existing.away_score != m["away_score"]
                 or existing.home_score_halftime != m["home_score_halftime"]
                 or existing.away_score_halftime != m["away_score_halftime"]
+                or existing.kickoff_utc != m["kickoff_utc"]
             )
             if needs_update:
                 was_not_finished = existing.status != "FINISHED"

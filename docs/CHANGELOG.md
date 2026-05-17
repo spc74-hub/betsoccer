@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-05-17
+- **fix:** Incluir `kickoff_utc` en la comparacion del sync para que actualice horarios TBD cuando football-data.org los confirma (los partidos sin hora se sincronizaban a 00:00 UTC y quedaban bloqueados antes de jugarse)
+- **fix:** Parsear `kickoff_utc` de string ISO a `datetime` antes de guardar (asyncpg requiere objetos datetime, el sync fallaba silenciosamente)
+
 ## 2026-04-12
 - **refactor:** Migracion completa de Supabase a PostgreSQL self-hosted con FastAPI + SQLAlchemy
 - **refactor:** Nuevo backend Python con endpoints REST que reemplazan las API routes de Next.js + Supabase

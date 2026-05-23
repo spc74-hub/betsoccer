@@ -9,6 +9,8 @@ services:
       - ./backend/.env
     networks:
       - spcapps-network
+    cpus: 1.0
+    mem_limit: 1g
 
   betsoccer-frontend:
     build:
@@ -22,6 +24,8 @@ services:
       - NEXT_PUBLIC_API_URL=https://betsoccer.spcapps.com
     networks:
       - spcapps-network
+    cpus: 0.5
+    mem_limit: 512m
 
 networks:
   spcapps-network:

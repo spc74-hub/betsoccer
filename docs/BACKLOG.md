@@ -3,8 +3,8 @@
 ## Prioridad Alta
 
 - [ ] **Roles de usuario (admin vs jugador)** — Actualmente no hay distincion de roles. Cualquier usuario autenticado puede cerrar temporadas, recalcular puntos y editar pronosticos de otros. Implementar sistema de roles para restringir acciones administrativas.
-- [ ] **Proteger endpoint de sync con SYNC_API_SECRET** — La funcion `_verify_secret` esta definida pero nunca se llama en el handler de sync. El cron necesita autenticarse con el secret, no con JWT.
-- [ ] **Configurar cron de sincronizacion automatica** — Configurar un cron job en el VPS que llame a POST /api/sync periodicamente (e.g. cada 30 min en dias de partido, diario el resto).
+- [x] **Proteger endpoint de sync con SYNC_API_SECRET** — Cablear `require_sync_auth` que valida JWT o SYNC_API_SECRET para los endpoints /api/sync y /api/sync/worldcup (permite crons desatendidos). 
+- [ ] **Configurar cron de sincronizacion automatica** — Configurar un cron job en el VPS que llame a POST /api/sync/worldcup periodicamente (cada 30 min en ventana 16:00–06:00 UTC durante Mundial, usando SYNC_API_SECRET).
 
 ## Prioridad Media
 

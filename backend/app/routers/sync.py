@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import decode_token
 from app.config import get_settings
 from app.database import get_db
 from app.models.models import Match, User
@@ -20,12 +21,33 @@ router = APIRouter(prefix="/api/sync", tags=["sync"])
 settings = get_settings()
 
 
-def _verify_secret(request: Request) -> bool:
+async def require_sync_auth(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Allow either a valid user JWT or the SYNC_API_SECRET bearer token.
+
+    The secret path is what unattended cron jobs use, since a JWT expires
+    after JWT_EXPIRATION_MINUTES and can't be kept fresh by a scheduler.
+    """
     auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = auth[len("Bearer "):]
+
+    # Cron path: shared secret
     secret = settings.SYNC_API_SECRET
-    if not secret:
-        return False
-    return auth == f"Bearer {secret}"
+    if secret and token == secret:
+        return
+
+    # User path: valid JWT belonging to an existing user
+    payload = decode_token(token)  # raises 401 if invalid
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    result = await db.execute(select(User).where(User.id == UUID(user_id)))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=401, detail="User not found")
 
 
 async def _upsert_matches(db: AsyncSession, matches: list[dict]) -> tuple[int, int, int]:
@@ -105,15 +127,9 @@ async def _upsert_matches(db: AsyncSession, matches: list[dict]) -> tuple[int, i
 
 @router.post("", response_model=SyncResponse)
 async def sync_matches(
-    request: Request,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    _auth: None = Depends(require_sync_auth),
 ):
-    # Auth: either bearer secret (cron) or logged-in user
-    # get_current_user already validates the JWT; if it fails we won't get here
-    # But for cron jobs we also accept the sync secret
-    # (The dependency already passed, so we're authenticated)
-
     try:
         matches = await fetch_all_tracked_matches()
     except Exception as e:
@@ -139,9 +155,8 @@ async def sync_matches(
 
 @router.post("/worldcup", response_model=SyncResponse)
 async def sync_worldcup(
-    request: Request,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    _auth: None = Depends(require_sync_auth),
 ):
     """Sync all FIFA World Cup matches from football-data.org into the matches table.
 

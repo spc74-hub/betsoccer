@@ -3,6 +3,8 @@
 ## 2026-06-13
 - **feat:** Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup) desde football-data.org, reusando upsert + calculo de puntos del sync de liga
 - **feat:** Soporte del Mundial como Season independiente (clasificacion separada por season_id)
+- **feat:** Auth de sync por SYNC_API_SECRET ademas de JWT (require_sync_auth) para permitir crons desatendidos en /api/sync y /api/sync/worldcup
+- **fix:** Cablear SYNC_API_SECRET que estaba definido pero sin usar (_verify_secret era codigo muerto)
 
 ## 2026-05-17
 - **fix:** Incluir `kickoff_utc` en la comparacion del sync para que actualice horarios TBD cuando football-data.org los confirma (los partidos sin hora se sincronizaban a 00:00 UTC y quedaban bloqueados antes de jugarse)

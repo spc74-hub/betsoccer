@@ -233,6 +233,19 @@ betsoccer-migration/
 - **Base de datos:** `betsoccer` en PostgreSQL 16 compartido (user: `spcadmin`)
 - **Seed inicial:** `python seed.py` crea admin + primera temporada
 
+### Cron de sincronizacion (Mundial 2026)
+
+Sincronizacion automatica de los partidos del Mundial mediante cron en el VPS (no en el repo):
+
+- **Script:** `/opt/betsoccer/sync-worldcup.sh` — lee `SYNC_API_SECRET` del `.env` y llama a `POST /api/sync/worldcup`
+- **Crontab (root, UTC):**
+  - `*/30 0-5,16-23 * * *` — cada 30 min en la ventana de partidos (16:00-06:00 UTC) para resultados + puntos
+  - `0 14 * * *` — catch-up diario para brackets/eliminatorias y cambios de horario
+- **Logs:** `/var/log/betsoccer-wc-sync.log`
+- **Auth:** los endpoints de sync aceptan JWT o `SYNC_API_SECRET` (este ultimo para crons desatendidos, via dependencia `require_sync_auth`)
+- **Lanzamiento manual:** `ssh root@72.62.26.203 /opt/betsoccer/sync-worldcup.sh`
+- **Nota:** el Mundial termina el 2026-07-19; tras esa fecha el cron puede eliminarse (las llamadas sin cambios son inocuas)
+
 ### Variables de entorno (backend/.env)
 ```
 DATABASE_URL, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_MINUTES

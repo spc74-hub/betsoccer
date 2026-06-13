@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-13
+- **feat:** Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup) desde football-data.org, reusando upsert + calculo de puntos del sync de liga
+- **feat:** Soporte del Mundial como Season independiente (clasificacion separada por season_id)
+
 ## 2026-05-17
 - **fix:** Incluir `kickoff_utc` en la comparacion del sync para que actualice horarios TBD cuando football-data.org los confirma (los partidos sin hora se sincronizaban a 00:00 UTC y quedaban bloqueados antes de jugarse)
 - **fix:** Parsear `kickoff_utc` de string ISO a `datetime` antes de guardar (asyncpg requiere objetos datetime, el sync fallaba silenciosamente)

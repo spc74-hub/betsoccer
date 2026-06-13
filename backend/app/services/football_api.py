@@ -16,7 +16,7 @@ settings = get_settings()
 
 FOOTBALL_DATA_BASE = "https://api.football-data.org/v4"
 FOOTBALL_DATA_TEAMS = {"REAL_MADRID": 86, "BARCELONA": 81}
-COMPETITION_IDS = {"LA_LIGA": "PD", "SEGUNDA": "SD"}
+COMPETITION_IDS = {"LA_LIGA": "PD", "SEGUNDA": "SD", "WORLD_CUP": "WC"}
 
 STATUS_MAP_FD = {
     "SCHEDULED": "SCHEDULED",

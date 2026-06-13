@@ -9,7 +9,11 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.models import Match, User
 from app.schemas import SyncResponse, SyncStats
-from app.services.football_api import fetch_all_tracked_matches
+from app.services.football_api import (
+    COMPETITION_IDS,
+    fetch_all_tracked_matches,
+    fetch_competition_matches,
+)
 from app.services.points import calculate_points_for_match
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -24,25 +28,12 @@ def _verify_secret(request: Request) -> bool:
     return auth == f"Bearer {secret}"
 
 
-@router.post("", response_model=SyncResponse)
-async def sync_matches(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
-):
-    # Auth: either bearer secret (cron) or logged-in user
-    # get_current_user already validates the JWT; if it fails we won't get here
-    # But for cron jobs we also accept the sync secret
-    # (The dependency already passed, so we're authenticated)
+async def _upsert_matches(db: AsyncSession, matches: list[dict]) -> tuple[int, int, int]:
+    """Insert/update matches and recalculate points for finished ones.
 
-    try:
-        matches = await fetch_all_tracked_matches()
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch matches from Football API: {str(e)}",
-        )
-
+    Shared by the team-based sync (Real Madrid / Barcelona) and the
+    competition-based sync (World Cup). Returns (created, updated, errors).
+    """
     created = 0
     updated = 0
     errors = 0
@@ -63,7 +54,6 @@ async def sync_matches(
                 or existing.kickoff_utc != m["kickoff_utc"]
             )
             if needs_update:
-                was_not_finished = existing.status != "FINISHED"
                 existing.status = m["status"]
                 existing.home_score = m["home_score"]
                 existing.away_score = m["away_score"]
@@ -110,9 +100,68 @@ async def sync_matches(
                 await db.rollback()
                 errors += 1
 
+    return created, updated, errors
+
+
+@router.post("", response_model=SyncResponse)
+async def sync_matches(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    # Auth: either bearer secret (cron) or logged-in user
+    # get_current_user already validates the JWT; if it fails we won't get here
+    # But for cron jobs we also accept the sync secret
+    # (The dependency already passed, so we're authenticated)
+
+    try:
+        matches = await fetch_all_tracked_matches()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch matches from Football API: {str(e)}",
+        )
+
+    created, updated, errors = await _upsert_matches(db, matches)
+
     return SyncResponse(
         success=True,
         message="Matches synced successfully",
+        stats=SyncStats(
+            total=len(matches),
+            created=created,
+            updated=updated,
+            errors=errors,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+
+
+@router.post("/worldcup", response_model=SyncResponse)
+async def sync_worldcup(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    """Sync all FIFA World Cup matches from football-data.org into the matches table.
+
+    Uses the same upsert + points logic as the team-based sync. Intended to be
+    run while the 'Mundial 2026' season is active so predictions and standings
+    attach to it.
+    """
+    try:
+        matches = await fetch_competition_matches(COMPETITION_IDS["WORLD_CUP"])
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch World Cup matches from Football API: {str(e)}",
+        )
+
+    created, updated, errors = await _upsert_matches(db, matches)
+
+    return SyncResponse(
+        success=True,
+        message="World Cup matches synced successfully",
         stats=SyncStats(
             total=len(matches),
             created=created,

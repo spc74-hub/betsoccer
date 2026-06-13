@@ -94,6 +94,7 @@ betsoccer-migration/
 ### Sincronizacion
 - Endpoint POST /api/sync que obtiene partidos de football-data.org
 - Actualiza/crea partidos de Real Madrid y Barcelona
+- Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup)
 - Calcula puntos automaticamente cuando un partido pasa a FINISHED
 - Autenticacion via JWT o SYNC_API_SECRET (para cron)
 
@@ -194,6 +195,7 @@ betsoccer-migration/
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
 | POST | `/api/sync` | JWT | Sincroniza partidos desde football-data.org y calcula puntos |
+| POST | `/api/sync/worldcup` | JWT | Sincroniza partidos del Mundial (FIFA World Cup) desde football-data.org y calcula puntos |
 | GET | `/api/sync` | No | Metadata del endpoint |
 
 ### LaLiga (`/api/laliga`)

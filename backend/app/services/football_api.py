@@ -3,6 +3,7 @@ Football API integrations - ported from src/lib/football-api.ts and src/lib/api-
 Uses football-data.org (free tier) as primary and api-football as fallback.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -58,18 +59,47 @@ def _get_current_season() -> int:
     return now.year - 1 if now.month < 7 else now.year
 
 
-async def _fd_fetch_team_matches(client: httpx.AsyncClient, team_id: int) -> list[dict]:
+async def _fd_get(
+    client: httpx.AsyncClient,
+    path: str,
+    params: Optional[dict] = None,
+    retries: int = 3,
+) -> dict:
+    """GET against football-data.org with retries.
+
+    The free tier intermittently drops the connection ("Server disconnected
+    without sending a response"), which previously caused the sync to silently
+    miss updates (e.g. a match going FINISHED). Retry transient request errors
+    with a short backoff.
+    """
     key = settings.FOOTBALL_DATA_KEY
     if not key:
         raise ValueError("FOOTBALL_DATA_KEY not configured")
 
-    resp = await client.get(
-        f"{FOOTBALL_DATA_BASE}/teams/{team_id}/matches",
+    last_exc: Optional[Exception] = None
+    for attempt in range(retries):
+        try:
+            resp = await client.get(
+                f"{FOOTBALL_DATA_BASE}{path}",
+                params=params,
+                headers={"X-Auth-Token": key},
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.RequestError as e:
+            # Network/transport errors (incl. RemoteProtocolError) -> retry
+            last_exc = e
+            if attempt < retries - 1:
+                await asyncio.sleep(2 * (attempt + 1))
+    raise last_exc
+
+
+async def _fd_fetch_team_matches(client: httpx.AsyncClient, team_id: int) -> list[dict]:
+    data = await _fd_get(
+        client,
+        f"/teams/{team_id}/matches",
         params={"status": "SCHEDULED,LIVE,IN_PLAY,PAUSED,FINISHED"},
-        headers={"X-Auth-Token": key},
     )
-    resp.raise_for_status()
-    data = resp.json()
 
     out = []
     for m in data.get("matches", []):
@@ -108,17 +138,8 @@ async def fetch_all_tracked_matches() -> list[dict]:
 
 
 async def fetch_competition_matches(competition_id: str) -> list[dict]:
-    key = settings.FOOTBALL_DATA_KEY
-    if not key:
-        raise ValueError("FOOTBALL_DATA_KEY not configured")
-
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            f"{FOOTBALL_DATA_BASE}/competitions/{competition_id}/matches",
-            headers={"X-Auth-Token": key},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _fd_get(client, f"/competitions/{competition_id}/matches")
 
     out = []
     for m in data.get("matches", []):
@@ -144,17 +165,8 @@ async def fetch_competition_matches(competition_id: str) -> list[dict]:
 
 
 async def fetch_competition_standings(competition_id: str) -> list[dict]:
-    key = settings.FOOTBALL_DATA_KEY
-    if not key:
-        raise ValueError("FOOTBALL_DATA_KEY not configured")
-
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            f"{FOOTBALL_DATA_BASE}/competitions/{competition_id}/standings",
-            headers={"X-Auth-Token": key},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _fd_get(client, f"/competitions/{competition_id}/standings")
 
     total = next((s for s in data.get("standings", []) if s["type"] == "TOTAL"), None)
     if not total:

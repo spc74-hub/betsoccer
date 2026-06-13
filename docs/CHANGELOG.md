@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-14
+- **fix:** El boton de sincronizar manual en Jornada ahora sincroniza tambien el Mundial (/api/sync/worldcup), antes solo sincronizaba liga y los partidos del Mundial acabados seguian apareciendo como LIVE
+- **fix:** Reintentos (3x con backoff) en las llamadas a football-data.org para tolerar cortes de conexion intermitentes que hacian perder actualizaciones de estado/resultado
+
 ## 2026-06-13
 - **feat:** Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup) desde football-data.org, reusando upsert + calculo de puntos del sync de liga
 - **feat:** Soporte del Mundial como Season independiente (clasificacion separada por season_id)

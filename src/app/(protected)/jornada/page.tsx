@@ -21,11 +21,30 @@ export default function JornadaPage() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncResult(null);
+    type SyncResp = { success: boolean; message: string; stats: { updated: number; created: number } };
     try {
-      const data = await apiFetch<{ success: boolean; message: string; stats: { updated: number; created: number } }>('/api/sync', { method: 'POST' });
+      // Sync both the tracked-teams league matches and the World Cup.
+      // allSettled so one endpoint failing doesn't hide the other's result.
+      const results = await Promise.allSettled([
+        apiFetch<SyncResp>('/api/sync', { method: 'POST' }),
+        apiFetch<SyncResp>('/api/sync/worldcup', { method: 'POST' }),
+      ]);
+      const ok = results.filter(
+        (r): r is PromiseFulfilledResult<SyncResp> => r.status === 'fulfilled'
+      );
+      if (ok.length === 0) {
+        const firstErr = results.find((r) => r.status === 'rejected') as
+          | PromiseRejectedResult
+          | undefined;
+        throw new Error(
+          firstErr?.reason instanceof Error ? firstErr.reason.message : 'Error al sincronizar'
+        );
+      }
+      const updated = ok.reduce((s, r) => s + r.value.stats.updated, 0);
+      const created = ok.reduce((s, r) => s + r.value.stats.created, 0);
       setSyncResult({
         success: true,
-        message: `Sincronizado: ${data.stats.updated} actualizados, ${data.stats.created} nuevos`,
+        message: `Sincronizado: ${updated} actualizados, ${created} nuevos`,
       });
       window.location.reload();
     } catch (err) {

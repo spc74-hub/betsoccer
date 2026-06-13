@@ -27,5 +27,6 @@
 
 ## Bugs Conocidos
 
+- [x] **Sync manual no cubria el Mundial** — El boton de sincronizar en Jornada solo llamaba a /api/sync (liga), por lo que los partidos del Mundial acabados seguian mostrando estado LIVE. Arreglado el 2026-06-14: handleSync ahora llama a /api/sync Y /api/sync/worldcup con Promise.allSettled.
 - [ ] **Funcion calculatePoints del frontend es legacy** — `src/lib/utils.ts:calculatePoints` devuelve 1 o 0 (sistema antiguo). No se usa activamente pero puede causar confusion si alguien la llama. El calculo real esta en el backend (`services/points.py`).
 - [ ] **Cross-user predictions sin validacion de rol** — Cualquier usuario puede enviar predicciones para otro usuario pasando `user_id` en el body del POST. Deberia requerir rol admin.

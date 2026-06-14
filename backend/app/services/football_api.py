@@ -17,7 +17,7 @@ settings = get_settings()
 
 FOOTBALL_DATA_BASE = "https://api.football-data.org/v4"
 FOOTBALL_DATA_TEAMS = {"REAL_MADRID": 86, "BARCELONA": 81}
-COMPETITION_IDS = {"LA_LIGA": "PD", "SEGUNDA": "SD", "WORLD_CUP": "WC"}
+COMPETITION_IDS = {"LA_LIGA": "PD", "SEGUNDA": "SD", "WORLD_CUP": "WC", "CHAMPIONS": "CL"}
 
 STATUS_MAP_FD = {
     "SCHEDULED": "SCHEDULED",
@@ -94,46 +94,58 @@ async def _fd_get(
     raise last_exc
 
 
-async def _fd_fetch_team_matches(client: httpx.AsyncClient, team_id: int) -> list[dict]:
-    data = await _fd_get(
-        client,
-        f"/teams/{team_id}/matches",
-        params={"status": "SCHEDULED,LIVE,IN_PLAY,PAUSED,FINISHED"},
-    )
+def _map_fd_match(m: dict) -> dict:
+    """Map a football-data.org match object to our internal match dict."""
+    season_year = int(m["season"]["startDate"][:4])
+    return {
+        "external_id": m["id"],
+        "competition": m["competition"]["name"],
+        "competition_logo": m["competition"].get("emblem"),
+        "season": f"{season_year}/{season_year + 1}",
+        "home_team": m["homeTeam"]["name"],
+        "home_team_logo": m["homeTeam"].get("crest"),
+        "away_team": m["awayTeam"]["name"],
+        "away_team_logo": m["awayTeam"].get("crest"),
+        "kickoff_utc": _parse_utc(m["utcDate"]),
+        "venue": m.get("venue"),
+        "status": STATUS_MAP_FD.get(m["status"], "SCHEDULED"),
+        "home_score": m["score"]["fullTime"]["home"],
+        "away_score": m["score"]["fullTime"]["away"],
+        "home_score_halftime": m["score"]["halfTime"]["home"] if m["score"].get("halfTime") else None,
+        "away_score_halftime": m["score"]["halfTime"]["away"] if m["score"].get("halfTime") else None,
+    }
 
-    out = []
-    for m in data.get("matches", []):
-        season_year = int(m["season"]["startDate"][:4])
-        out.append({
-            "external_id": m["id"],
-            "competition": m["competition"]["name"],
-            "competition_logo": m["competition"].get("emblem"),
-            "season": f"{season_year}/{season_year + 1}",
-            "home_team": m["homeTeam"]["name"],
-            "home_team_logo": m["homeTeam"].get("crest"),
-            "away_team": m["awayTeam"]["name"],
-            "away_team_logo": m["awayTeam"].get("crest"),
-            "kickoff_utc": _parse_utc(m["utcDate"]),
-            "venue": m.get("venue"),
-            "status": STATUS_MAP_FD.get(m["status"], "SCHEDULED"),
-            "home_score": m["score"]["fullTime"]["home"],
-            "away_score": m["score"]["fullTime"]["away"],
-            "home_score_halftime": m["score"]["halfTime"]["home"] if m["score"].get("halfTime") else None,
-            "away_score_halftime": m["score"]["halfTime"]["away"] if m["score"].get("halfTime") else None,
-        })
-    return out
+
+# Free-tier competitions scanned for tracked-team (Real Madrid / Barcelona)
+# matches. The /teams/{id}/matches endpoint is restricted on the free tier
+# (403), so we pull these competitions and filter by team id. Copa del Rey is
+# not available on the free tier.
+TRACKED_COMPETITIONS = [COMPETITION_IDS["LA_LIGA"], COMPETITION_IDS["CHAMPIONS"]]
 
 
 async def fetch_all_tracked_matches() -> list[dict]:
-    """Fetch all Real Madrid and Barcelona matches, deduplicating El Clasico."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        rm = await _fd_fetch_team_matches(client, FOOTBALL_DATA_TEAMS["REAL_MADRID"])
-        barca = await _fd_fetch_team_matches(client, FOOTBALL_DATA_TEAMS["BARCELONA"])
+    """Fetch all Real Madrid and Barcelona matches across free-tier competitions.
 
+    Filters each competition's match list by team id and deduplicates (e.g. El
+    Clasico appears once). Replaces the restricted /teams/{id}/matches endpoint.
+    """
+    tracked_team_ids = set(FOOTBALL_DATA_TEAMS.values())
     match_map: dict[int, dict] = {}
-    for m in rm + barca:
-        if m["external_id"]:
-            match_map[m["external_id"]] = m
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for comp_id in TRACKED_COMPETITIONS:
+            try:
+                data = await _fd_get(client, f"/competitions/{comp_id}/matches")
+            except httpx.HTTPStatusError:
+                # Competition out of season / unavailable on the plan -> skip.
+                continue
+            for m in data.get("matches", []):
+                if (
+                    m["homeTeam"].get("id") in tracked_team_ids
+                    or m["awayTeam"].get("id") in tracked_team_ids
+                ) and m.get("id"):
+                    match_map[m["id"]] = _map_fd_match(m)
+
     return list(match_map.values())
 
 
@@ -141,27 +153,7 @@ async def fetch_competition_matches(competition_id: str) -> list[dict]:
     async with httpx.AsyncClient(timeout=30.0) as client:
         data = await _fd_get(client, f"/competitions/{competition_id}/matches")
 
-    out = []
-    for m in data.get("matches", []):
-        season_year = int(m["season"]["startDate"][:4])
-        out.append({
-            "external_id": m["id"],
-            "competition": m["competition"]["name"],
-            "competition_logo": m["competition"].get("emblem"),
-            "season": f"{season_year}/{season_year + 1}",
-            "home_team": m["homeTeam"]["name"],
-            "home_team_logo": m["homeTeam"].get("crest"),
-            "away_team": m["awayTeam"]["name"],
-            "away_team_logo": m["awayTeam"].get("crest"),
-            "kickoff_utc": _parse_utc(m["utcDate"]),
-            "venue": m.get("venue"),
-            "status": STATUS_MAP_FD.get(m["status"], "SCHEDULED"),
-            "home_score": m["score"]["fullTime"]["home"],
-            "away_score": m["score"]["fullTime"]["away"],
-            "home_score_halftime": m["score"]["halfTime"]["home"] if m["score"].get("halfTime") else None,
-            "away_score_halftime": m["score"]["halfTime"]["away"] if m["score"].get("halfTime") else None,
-        })
-    return out
+    return [_map_fd_match(m) for m in data.get("matches", [])]
 
 
 async def fetch_competition_standings(competition_id: str) -> list[dict]:

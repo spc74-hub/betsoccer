@@ -3,6 +3,8 @@
 ## 2026-06-14
 - **fix:** El boton de sincronizar manual en Jornada ahora sincroniza tambien el Mundial (/api/sync/worldcup), antes solo sincronizaba liga y los partidos del Mundial acabados seguian apareciendo como LIVE
 - **fix:** Reintentos (3x con backoff) en las llamadas a football-data.org para tolerar cortes de conexion intermitentes que hacian perder actualizaciones de estado/resultado
+- **fix:** Sync de liga reescrito para usar endpoints de competicion en vez de /teams/{id}/matches (restringido en tier gratuito, daba 403). Ahora cubre LaLiga + Champions League filtrando por equipo
+- **note:** La Copa del Rey no esta disponible en el tier gratuito de football-data.org, sus partidos no se sincronizan
 
 ## 2026-06-13
 - **feat:** Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup) desde football-data.org, reusando upsert + calculo de puntos del sync de liga

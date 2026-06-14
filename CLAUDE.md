@@ -289,6 +289,7 @@ Resumen: mejorar seguridad (roles admin), notificaciones, y UX de predicciones. 
 - Auth es client-side (localStorage JWT), no hay SSR auth
 - Todos los tiempos se muestran en zona horaria `Europe/Madrid`
 - La API externa principal es football-data.org v4 (no api-football.com)
+- El tier gratuito de football-data.org NO permite /teams/{id}/matches (403); el sync de equipos usa endpoints de competicion (LaLiga PD + Champions CL) filtrando por id de equipo. Copa del Rey no disponible en gratuito
 - CORS completamente abierto (`allow_origins=["*"]`)
 - Sin registro publico de usuarios
 - PWA habilitada con manifest.json

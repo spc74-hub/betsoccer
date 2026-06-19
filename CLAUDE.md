@@ -229,7 +229,12 @@ betsoccer-migration/
 - **Red Docker:** `spcapps-network` (externa, compartida con otros servicios)
 - **Reverse proxy:** Nginx
 - **Tunnel:** Cloudflare Tunnel (*.spcapps.com)
-- **Auto-deploy:** webhook en `https://webhook.spcapps.com/webhook` (git push → pull + build + restart)
+- **Deploy (CI) — ⚠️ NO se construye en el VPS:** `git push` a main → GitHub Actions
+  (`.github/workflows/build-and-push.yml`) construye `ghcr.io/spc74-hub/betsoccer-{backend,frontend}`
+  → GHCR → un webhook dispara `docker compose pull && up -d` en el VPS. NO hagas build ni
+  `git pull` de código en el VPS (corre desde la imagen de GHCR). Los `.md`/docs no disparan el
+  pipeline. Compose de prod en `spcapps-infra/projects/betsoccer/` (NO el de este repo).
+  Canónico: `spcapps-infra/docs/DEPLOY-MODEL.md`.
 - **Base de datos:** `betsoccer` en PostgreSQL 16 compartido (user: `spcadmin`)
 - **Seed inicial:** `python seed.py` crea admin + primera temporada
 

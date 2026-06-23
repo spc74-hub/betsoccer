@@ -18,6 +18,7 @@ class TokenResponse(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
+    current_password: str
     new_password: str
 
 
@@ -63,7 +64,8 @@ class PredictionCreate(BaseModel):
     away_score: int
     home_score_halftime: int = 0
     away_score_halftime: int = 0
-    user_id: Optional[UUID] = None  # allows cross-user predictions
+    # NOTE: no user_id here — a prediction is always saved for the authenticated
+    # user (server-side), never one supplied by the client (avoids impersonation).
 
 
 class PredictionOut(BaseModel):

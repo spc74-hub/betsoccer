@@ -52,3 +52,11 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Admin = the account whose email matches ADMIN_EMAIL. Used to gate admin
+    endpoints (the app has no role column; the admin is a single known account)."""
+    if user.email.lower().strip() != settings.ADMIN_EMAIL.lower().strip():
+        raise HTTPException(status_code=403, detail="Solo el administrador")
+    return user

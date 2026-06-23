@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-23 — Hardening de seguridad de auth
+- **fix(seguridad):** `change-password` ahora **exige la contraseña actual** (antes solo pedía la nueva → una sesión robada podía cambiarla). Formulario `reset-password` actualizado con el campo "contraseña actual".
+- **fix(seguridad):** `POST /api/predictions` ya **no acepta `user_id` en el body** — la predicción se guarda siempre para el usuario autenticado (antes se podía apostar en nombre de otro). Quitado `user_id` de `PredictionCreate`.
+- **fix(seguridad):** endpoints de **admin protegidos por `require_admin`** (admin = el email de `ADMIN_EMAIL`); antes cualquier usuario logueado podía llamarlos (p.ej. recalcular puntos).
+- **fix(seguridad):** **fail-closed de secretos** — la app no arranca si `JWT_SECRET`/`ADMIN_PASSWORD` siguen con el valor débil por defecto (`change-me`/`changeme`). Producción debe definir valores fuertes en el `.env`.
+- **feat:** reset de contraseña por consola (break-glass / reset admin de cualquier usuario, sin email): `docker exec betsoccer-backend python -m app.set_password <email> <nueva_pass>`.
+
 ## 2026-06-14
 - **fix:** El boton de sincronizar manual en Jornada ahora sincroniza tambien el Mundial (/api/sync/worldcup), antes solo sincronizaba liga y los partidos del Mundial acabados seguian apareciendo como LIVE
 - **fix:** Reintentos (3x con backoff) en las llamadas a football-data.org para tolerar cortes de conexion intermitentes que hacian perder actualizaciones de estado/resultado

@@ -63,8 +63,9 @@ async def create_or_update_prediction(
     if match.kickoff_utc <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Predictions are closed for this match")
 
-    # Determine which user to save for (cross-user predictions allowed)
-    target_user_id = body.user_id or current_user.id
+    # Always save the prediction for the authenticated user. The client cannot
+    # submit a prediction on behalf of someone else (no user_id in the payload).
+    target_user_id = current_user.id
 
     # Get active season
     season_result = await db.execute(

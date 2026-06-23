@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
 
 
@@ -17,6 +18,16 @@ class Settings(BaseSettings):
     ADMIN_DISPLAY_NAME: str = "Admin"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @model_validator(mode="after")
+    def _no_weak_secrets(self):
+        # Fail closed: refuse to start with the known weak defaults. Production
+        # MUST set strong JWT_SECRET and ADMIN_PASSWORD in the environment (.env).
+        if self.JWT_SECRET in ("", "change-me"):
+            raise ValueError("JWT_SECRET is unset or weak — set a strong value in the environment")
+        if self.ADMIN_PASSWORD in ("", "changeme"):
+            raise ValueError("ADMIN_PASSWORD is unset or weak — set a strong value in the environment")
+        return self
 
 
 @lru_cache()

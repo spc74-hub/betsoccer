@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export default function ResetPasswordPage() {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +35,7 @@ export default function ResetPasswordPage() {
     try {
       await apiFetch('/api/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ new_password: password }),
+        body: JSON.stringify({ current_password: currentPassword, new_password: password }),
       });
       setMessage('Contrasena actualizada correctamente. Redirigiendo...');
       setTimeout(() => {
@@ -66,6 +67,24 @@ export default function ResetPasswordPage() {
           </h2>
 
           <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <label
+                htmlFor="currentPassword"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Contrasena actual
+              </label>
+              <input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+
             <div>
               <label
                 htmlFor="password"

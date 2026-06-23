@@ -33,6 +33,25 @@ export function isAuthenticated(): boolean {
   return !!getToken();
 }
 
+// Cloudflare Access auto-login (no password). Uses a raw fetch (NOT apiFetch) so
+// a 401 — meaning "not behind Access" — just returns null instead of triggering
+// apiFetch's redirect-to-/login (which would loop on the login page).
+export async function cfAccessLogin(): Promise<{
+  access_token: string;
+  user: { id: string; email: string; display_name: string };
+} | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/cf-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}

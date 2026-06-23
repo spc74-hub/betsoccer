@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "changeme"
     ADMIN_DISPLAY_NAME: str = "Admin"
 
+    # Cloudflare Access auto-login (Option B). When CF_ACCESS_AUD is set, the
+    # /api/auth/cf-access endpoint trades a verified CF Access identity for a
+    # betsoccer session (no password). AUD = the app's "AUD tag".
+    CF_ACCESS_TEAM_DOMAIN: str = "https://spcapps.cloudflareaccess.com"
+    CF_ACCESS_AUD: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @model_validator(mode="after")

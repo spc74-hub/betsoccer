@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-23 — Cloudflare Access + auto-login (sin contraseña)
+- **feat(auth):** betsoccer pasa a **Cloudflare Access + código por email**, también para usuarios externos. Nuevo endpoint `POST /api/auth/cf-access` que canjea la identidad ya validada por Cloudflare por una sesión de betsoccer (busca al usuario por email, sin contraseña). Valida el JWT firmado `Cf-Access-Jwt-Assertion` contra las claves del equipo + `CF_ACCESS_AUD`. La recuperación pasa a ser automática (el buzón de email del usuario), eliminando el reset manual por consola.
+- **feat(frontend):** la página de login intenta el auto-login de Cloudflare al cargar (fetch crudo para no entrar en bucle con el redirect de 401); si pasa Access, entra directo a `/matches`. Si no, muestra el login normal.
+- **chore:** nueva config `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD`. El hardening previo se mantiene como defensa en profundidad. Nota Cloudflare: bypass para `/api/sync` (sincronización con `SYNC_API_SECRET`) y la Access App con sólo "One-time PIN" (sin Google).
+
 ## 2026-06-23 — Hardening de seguridad de auth
 - **fix(seguridad):** `change-password` ahora **exige la contraseña actual** (antes solo pedía la nueva → una sesión robada podía cambiarla). Formulario `reset-password` actualizado con el campo "contraseña actual".
 - **fix(seguridad):** `POST /api/predictions` ya **no acepta `user_id` en el body** — la predicción se guarda siempre para el usuario autenticado (antes se podía apostar en nombre de otro). Quitado `user_id` de `PredictionCreate`.

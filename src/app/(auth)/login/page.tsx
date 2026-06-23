@@ -1,16 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { apiFetch, setToken, setUser } from '@/lib/api';
+import { apiFetch, setToken, setUser, cfAccessLogin } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cfChecking, setCfChecking] = useState(true);
   const router = useRouter();
+
+  // Try Cloudflare Access auto-login first. If we're behind Access, this logs us
+  // in with no password and goes straight to /matches. Otherwise show the form.
+  useEffect(() => {
+    (async () => {
+      const data = await cfAccessLogin();
+      if (data?.access_token) {
+        setToken(data.access_token);
+        setUser(data.user);
+        router.replace('/matches');
+      } else {
+        setCfChecking(false);
+      }
+    })();
+  }, [router]);
+
+  if (cfChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

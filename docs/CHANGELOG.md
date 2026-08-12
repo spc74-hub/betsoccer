@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-08-12
+- **fix(auth):** el JWKS de Cloudflare ya no se cachea para siempre. Se descargaba una vez al arrancar el proceso y no se refrescaba nunca, así que en cuanto Cloudflare rotaba sus claves de firma el auto-login dejaba de funcionar: pasabas el OTP y la app te pedía usuario y contraseña. Ahora la caché caduca a la hora y, ante un fallo de verificación, se reintenta una vez con las claves recién descargadas — de modo que una rotación se absorbe al instante. Arreglado desde el chat de infra por ser un defecto transversal a 9 apps; contexto en `spcapps-infra/docs/PATTERNS.md`.
+
 ## 2026-06-23 — Cloudflare Access + auto-login (sin contraseña)
 - **feat(auth):** betsoccer pasa a **Cloudflare Access + código por email**, también para usuarios externos. Nuevo endpoint `POST /api/auth/cf-access` que canjea la identidad ya validada por Cloudflare por una sesión de betsoccer (busca al usuario por email, sin contraseña). Valida el JWT firmado `Cf-Access-Jwt-Assertion` contra las claves del equipo + `CF_ACCESS_AUD`. La recuperación pasa a ser automática (el buzón de email del usuario), eliminando el reset manual por consola.
 - **feat(frontend):** la página de login intenta el auto-login de Cloudflare al cargar (fetch crudo para no entrar en bucle con el redirect de 401); si pasa Access, entra directo a `/matches`. Si no, muestra el login normal.

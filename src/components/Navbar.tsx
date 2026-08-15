@@ -13,6 +13,7 @@ import {
   X,
   Users,
   Tv,
+  BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/matches', label: 'Partidos', icon: Calendar },
   { href: '/laliga', label: 'LaLiga', icon: Tv },
   { href: '/standings', label: 'Clasificacion', icon: Trophy },
+  { href: '/stats', label: 'Estadisticas', icon: BarChart3 },
   { href: '/history', label: 'Historial', icon: History },
 ];
 

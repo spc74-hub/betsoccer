@@ -159,3 +159,78 @@ export interface MatchWithPrediction extends Match {
 
 export type TeamFilter = 'all' | 'real-madrid' | 'barcelona';
 export type StatusFilter = 'upcoming' | 'finished' | 'all';
+
+// Stats page (/api/stats) — everything is derived from our own predictions
+export interface StatsPlayer {
+  user_id: string;
+  display_name: string;
+  total_points: number;
+  predictions: number;
+  avg_points: number;
+  accuracy: number;
+  perfect: number;
+  blanks: number;
+  breakdown: { winner: number; halftime: number; difference: number; exact: number };
+  hits: { winner: number; halftime: number; difference: number; exact: number };
+  current_streak: number;
+  best_streak: number;
+  best_match: StatsMatchRef | null;
+  worst_match: StatsMatchRef | null;
+  best_day: { date: string; points: number } | null;
+  cumulative: { date: string; label: string; points: number; total: number }[];
+}
+
+export interface StatsMatchRef {
+  label: string;
+  points: number;
+  date: string;
+}
+
+export interface StatsTendencies {
+  user_id: string;
+  display_name: string;
+  favourite_score: { score: string; count: number } | null;
+  avg_goals_predicted: number;
+  avg_goals_real: number;
+  avg_goal_error: number;
+  winner_accuracy: number;
+  halftime_accuracy: number;
+  by_team: { team: string; predictions: number; points: number; avg_points: number }[];
+}
+
+export interface StatsHeadToHead {
+  player_a: { user_id: string; display_name: string };
+  player_b: { user_id: string; display_name: string };
+  shared_matches: number;
+  a_wins: number;
+  b_wins: number;
+  draws: number;
+  both_exact: number;
+  both_blank: number;
+  timeline: { date: string; label: string; diff: number }[];
+}
+
+export interface StatsRecords {
+  seasons: {
+    name: string;
+    winner_name: string | null;
+    winner_points: number | null;
+    is_active: boolean;
+    start_date: string | null;
+    end_date: string | null;
+  }[];
+  titles: { player: string; count: number }[];
+  best_single: { player: string; label: string; result: string; points: number; date: string } | null;
+  best_day: { player: string; date: string; points: number } | null;
+  hardest_match: { label: string; result: string; avg_points: number; date: string } | null;
+  easiest_match: { label: string; result: string; avg_points: number; date: string } | null;
+  total_predictions: number;
+}
+
+export interface StatsPayload {
+  season: { id: string; name: string; is_active: boolean } | null;
+  players: StatsPlayer[];
+  head_to_head: StatsHeadToHead | null;
+  tendencies: StatsTendencies[];
+  records: StatsRecords;
+}

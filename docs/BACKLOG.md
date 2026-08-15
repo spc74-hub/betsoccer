@@ -20,7 +20,7 @@
   - **API-Football (api-sports.io):** el plan Free (100 req/dia) **NO da acceso a la temporada en curso**. Error literal de la API: `"Free plans do not have access to this season, try from 2022 to 2024."` Sirve para historico, no para 2026/27.
   - Los datos del Zamora **si existen** en API-Football y son los correctos (verificado con Courtois 2024/25: 32 partidos, 2700 min, 29 encajados, 77 paradas), pero para la temporada en curso hacen falta **$19/mes del plan Pro**. Decidir si compensa para una liga de 2 jugadores.
   - Descartados SofaScore y FotMob: sin API publica, habria que scrapear.
-- [ ] **Estadisticas de la liga de apuestas (BD propia)** — Rachas, mejor jornada, quien acierta mas los descansos, evolucion de puntos por jornada. Sale todo de las tablas `predictions`/`matches`, sin API externa ni coste. Pendiente de concretar que metricas interesan.
+- [x] **Estadisticas de la liga de apuestas (BD propia)** — Rachas, mejor jornada, quien acierta mas los descansos, evolucion de puntos por jornada. Sale todo de las tablas `predictions`/`matches`, sin API externa ni coste. **✅ RESUELTO 2026-08-15:** implementada vista `/stats` con endpoint `GET /api/stats` alimentado 100% desde BD propia. Cuatro bloques: tu rendimiento (puntos, media, precision, plenos, rachas, grafica acumulada, desglose por categoria), cara a cara (duelos vs otros jugadores), tus manias (marcador favorito, error medio, porcentajes, optimismo), palmares y records (temporadas ganadas, mejores dias, patrones). Selector de temporada; records historicos (todas las temporadas).
 
 
 - [ ] **Notificaciones de partidos proximos** — Avisar a los jugadores cuando un partido esta por empezar y no han hecho su pronostico.

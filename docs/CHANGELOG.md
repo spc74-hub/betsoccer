@@ -1,6 +1,7 @@
 # Changelog
 
-## 2026-08-15 (2)
+## 2026-08-15 (3)
+- **feat(stats):** nueva pagina `/stats` con estadisticas de la liga de apuestas alimentada 100% desde BD propia (sin API externa). Cuatro bloques: (1) Tu rendimiento — puntos totales, media, precision, plenos, pronosticos en blanco, rachas y desglose por categoria con grafica de puntos acumulados; (2) Cara a cara — duelos ganados vs otros jugadores en partidos compartidos, empates y grafica de diferencia acumulada; (3) Tus manias — marcador favorito, error medio en goles, porcentajes de acierto (1X2 y descanso), optimismo vs conservadurismo, y en que equipos puntuas mas; (4) Palmares y records — temporadas ganadas, mejor pronostico historico, mejor dia, partidos mas traicioneros y mas cantados, listado de temporadas. Endpoint `GET /api/stats?season_id=<uuid opcional>` con selector de temporada en la vista. Nuevos ficheros: `backend/app/services/stats.py`, `backend/app/routers/stats.py`, `src/app/(protected)/stats/page.tsx`. Modificados: `backend/app/main.py` (registra router), `src/components/Navbar.tsx` (entra en menu), `src/types/index.ts` (tipos StatsPayload). Graficas SVG inline, sin libreria nueva.
 - **fix(predictions):** el selector de jugador de la pagina "Partidos" ya no permite editar los
   pronosticos de otro. Antes la UI decia "Estas editando los pronosticos de X" y enviaba
   `user_id` en el POST, pero el backend ignora ese campo y siempre guarda para el usuario

@@ -192,6 +192,81 @@ Muestra tus resultados en partidos ya finalizados.
 
 ---
 
+## Estadisticas
+
+Pagina dedicada a analizar el rendimiento de los jugadores. Todo lo que ves aqui sale
+de vuestros propios pronosticos: no depende de ninguna API externa.
+
+### Acceso
+
+Entra desde **Estadisticas** en la barra de navegacion. Por defecto muestra la temporada
+activa; con el selector de arriba puedes ver cualquier temporada anterior.
+
+### 1. Tu rendimiento
+
+Una tarjeta por jugador, mas una grafica comun de puntos acumulados:
+
+- **Puntos totales** y **media** de puntos por pronostico (sobre un maximo de 10).
+- **Precision:** porcentaje de tus pronosticos que sacaron algun punto.
+- **Plenos:** pronosticos de 10 puntos, es decir, los que acertaron las cuatro categorias.
+- **En blanco:** pronosticos que se quedaron a cero puntos.
+- **Racha actual:** cuantos pronosticos seguidos llevas puntuando ahora mismo.
+- **Mejor racha:** la mayor cadena de pronosticos con puntos de la temporada.
+- **De donde salen los puntos:** una barra por categoria (ganador, descanso, diferencia,
+  exacto) con los **puntos** sumados en cada una; el numero pequeno de la derecha (×N) es
+  cuantas veces la acertaste.
+- **Mejor acierto:** el partido donde mas puntos sacaste.
+- **Mejor dia:** la fecha en la que mas puntos sumaste sumando todos los partidos del dia.
+- **Grafica de puntos acumulados:** una linea por jugador, para ver quien tiro de quien
+  y en que momento se abrio o cerro la brecha.
+
+### 2. Cara a cara
+
+El duelo entre los dos jugadores con mas puntos, contando **solo los partidos que ambos
+pronosticaron**:
+
+- **Duelos ganados:** en cuantos de esos partidos uno saco mas puntos que el otro, y
+  cuantos quedaron empatados.
+- **Ambos clavaron el exacto:** partidos en los que los dos acertasteis el resultado exacto.
+- **Ninguno puntuo:** partidos en los que los dos os quedasteis a cero.
+- **Diferencia acumulada:** la grafica de la ventaja a lo largo del tiempo. Por encima de
+  la linea central manda el primer jugador; por debajo, el segundo.
+
+> **Ojo:** esta ventaja **no tiene por que coincidir con la de la Clasificacion**. Aqui solo
+> cuentan los partidos que pronosticaron los dos, asi que los partidos que solo pronostico
+> uno de vosotros quedan fuera del calculo.
+
+### 3. Tus manias
+
+Los patrones que no se ven en la clasificacion:
+
+- **Marcador favorito:** el resultado que mas repites, y cuantas veces lo has puesto.
+- **Error medio:** de media, cuantos goles te separan del marcador real (sumando la
+  desviacion del local y la del visitante). Siempre es positivo: mide cuanto fallas, no
+  en que direccion.
+- **Acierta el 1X2** y **acierta el descanso:** porcentaje de aciertos en cada una.
+- **Goles que pronostica vs goles reales:** si pronosticas mas goles de los que se marcan,
+  la app te llama **optimista**; si pronosticas menos, **conservador**; y si la diferencia
+  es minima, **clavado**.
+- **Donde mas puntua:** los equipos con los que mejor se te da, en puntos por partido.
+  Solo aparecen equipos con al menos 3 pronosticos, para que un unico acierto no distorsione.
+
+### 4. Palmares y records
+
+A diferencia de los bloques anteriores, **los records son historicos**: cuentan todas las
+temporadas, no la seleccionada en el desplegable.
+
+- **Palmares:** cuantas temporadas ha ganado cada jugador.
+- **Mejor pronostico:** la mejor puntuacion individual de la historia, de cualquier jugador,
+  con el partido y el resultado real.
+- **Mejor dia:** el dia con mas puntos sumados por un jugador.
+- **El partido mas traicionero:** el partido concreto con la media de puntos mas baja entre
+  todos los que lo pronosticaron. El que os pillo a todos.
+- **El mas cantado:** el contrario, el partido con la media mas alta.
+- **Temporadas:** el listado completo, con el ganador y sus puntos.
+
+---
+
 ## Datos tecnicos para el usuario
 
 ### Zona horaria

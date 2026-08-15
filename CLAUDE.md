@@ -32,13 +32,13 @@ betsoccer-migration/
 │   │   ├── auth.py          # JWT creation/validation, bcrypt
 │   │   ├── schemas.py       # Pydantic request/response schemas
 │   │   ├── models/models.py # SQLAlchemy models (User, Match, Prediction, Season)
-│   │   ├── routers/         # Endpoints: auth, users, matches, predictions, standings, sync, laliga, admin
-│   │   └── services/        # football_api, points, seasons
+│   │   ├── routers/         # Endpoints: auth, users, matches, predictions, standings, stats, sync, laliga, admin
+│   │   └── services/        # football_api, points, seasons, stats
 │   └── seed.py              # Seed admin user + primera temporada
 ├── src/                     # Next.js frontend
 │   ├── app/
 │   │   ├── (auth)/          # Login, reset-password (sin navbar)
-│   │   └── (protected)/     # Matches, jornada, laliga, standings, history (con navbar)
+│   │   └── (protected)/     # Matches, jornada, laliga, standings, stats, history (con navbar)
 │   ├── components/          # MatchCard, Navbar, TeamFilter
 │   ├── lib/                 # api.ts (cliente HTTP), utils, football APIs
 │   ├── middleware.ts         # Redirect / → /login
@@ -98,6 +98,15 @@ betsoccer-migration/
 - Endpoint POST /api/sync/worldcup para sincronizar partidos del Mundial (FIFA World Cup)
 - Calcula puntos automaticamente cuando un partido pasa a FINISHED
 - Autenticacion via JWT o SYNC_API_SECRET (para cron)
+
+### Estadisticas
+- Vista `/stats` con analisis profundo de rendimiento (BD propia, sin API externa)
+- **Tu rendimiento:** puntos totales, media, precision, plenos, pronosticos en blanco, racha actual y mejor racha, desglose de puntos por categoria (ganador/descanso/diferencia/exacto) con numero de aciertos, mejor pronostico, mejor dia, grafica de puntos acumulados
+- **Cara a cara:** duelos ganados por cada jugador en partidos compartidos, empates, veces que ambos clavaron el exacto, veces que ninguno puntuo, grafica de diferencia acumulada
+- **Tus manias:** marcador favorito, error medio en goles, % de acierto del 1X2, % de acierto del descanso, comparativa goles pronosticados vs reales (indica si eres optimista o conservador), en que equipos puntuas mas
+- **Palmares y records:** temporadas ganadas por jugador, mejor pronostico historico, mejor dia, partido mas traicionero y mas cantado, listado de temporadas
+- Selector de temporada; records son historicos (todas las temporadas)
+- Graficas SVG inline
 
 ### Sistema de puntuacion (acumulativo, max 10 pts/partido)
 | Condicion | Puntos |
@@ -204,6 +213,11 @@ betsoccer-migration/
 |--------|------|------|-------------|
 | GET | `/api/laliga` | No | Proxy a football-data.org. Params: `type` (matches/standings) |
 
+### Stats (`/api/stats`)
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| GET | `/api/stats` | JWT | Estadisticas de la liga de apuestas (BD propia). Params: `season_id` (uuid opcional, usa activa si se omite). Devuelve 4 bloques: tu rendimiento, cara a cara, tus manias, palmares y records |
+
 ### Admin (`/api/admin`)
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
@@ -296,9 +310,12 @@ NEXT_PUBLIC_API_URL=https://betsoccer.spcapps.com
 | `backend/app/services/seasons.py` | Logica de temporadas y clasificaciones |
 | `backend/app/routers/sync.py` | Sincronizacion de partidos y calculo de puntos |
 | `backend/app/routers/predictions.py` | CRUD de pronosticos |
+| `backend/app/services/stats.py` | Logica de estadisticas de la liga (BD propia) |
+| `backend/app/routers/stats.py` | Endpoint GET /api/stats |
 | `src/components/MatchCard.tsx` | Componente principal de pronostico |
 | `src/app/(protected)/jornada/page.tsx` | Vista comparativa de todos los jugadores |
 | `src/app/(protected)/standings/page.tsx` | Clasificacion + gestion de temporadas |
+| `src/app/(protected)/stats/page.tsx` | Vista de estadisticas (4 bloques + selector temporada) |
 | `src/lib/api.ts` | Cliente HTTP + gestion de auth (localStorage) |
 | `src/types/index.ts` | Tipos TypeScript del dominio |
 | `docker-compose.yml` | Definicion de containers frontend + backend |

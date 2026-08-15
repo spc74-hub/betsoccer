@@ -238,18 +238,25 @@ betsoccer-migration/
 - **Base de datos:** `betsoccer` en PostgreSQL 16 compartido (user: `spcadmin`)
 - **Seed inicial:** `python seed.py` crea admin + primera temporada
 
-### Cron de sincronizacion (Mundial 2026)
+### Cron de sincronizacion (Mundial 2026) — RETIRADO
 
-Sincronizacion automatica de los partidos del Mundial mediante cron en el VPS (no en el repo):
+Sincronizacion automatica del Mundial: **RETIRADO desde 2026-08-15** (torneo finalizado 2026-07-19).
 
-- **Script:** `/usr/local/bin/betsoccer-sync-worldcup.sh` — lee `SYNC_API_SECRET` del `.env` y llama a `POST /api/sync/worldcup`. Fuera de `/opt/betsoccer` para sobrevivir al `git clean` del auto-deploy
-- **Crontab (root, UTC):**
-  - `*/30 0-5,16-23 * * *` — cada 30 min en la ventana de partidos (16:00-06:00 UTC) para resultados + puntos
-  - `0 14 * * *` — catch-up diario para brackets/eliminatorias y cambios de horario
-- **Logs:** `/var/log/betsoccer-wc-sync.log`
-- **Auth:** los endpoints de sync aceptan JWT o `SYNC_API_SECRET` (este ultimo para crons desatendidos, via dependencia `require_sync_auth`)
-- **Lanzamiento manual:** `ssh root@72.62.26.203 /usr/local/bin/betsoccer-sync-worldcup.sh`
-- **Nota:** el Mundial termina el 2026-07-19; tras esa fecha el cron puede eliminarse (las llamadas sin cambios son inocuas)
+- **Estado:** cron eliminado del crontab de root en el VPS
+- **Archivos retirados:**
+  - Script movido a `/root/betsoccer-sync-worldcup.sh.retired` (backup para referencia futura)
+  - Log archivado como `/var/log/betsoccer-wc-sync.log.gz`
+- **Endpoint disponible:** `POST /api/sync/worldcup` sigue en el backend. Para lanzarlo a mano, desde el VPS:
+  ```bash
+  ssh root@72.62.26.203 'bash /root/betsoccer-sync-worldcup.sh.retired'
+  ```
+  El script lee `SYNC_API_SECRET` de `/opt/betsoccer/backend/.env` y lo envia como
+  `Authorization: Bearer <secret>` (no hay cabecera propia: `require_sync_auth` acepta
+  en esa misma cabecera o bien el secret o bien un JWT de usuario)
+- **Nota historica:** durante el torneo (2026-06-13 a 2026-07-19), el cron ejecutaba:
+  - `*/30 0-5,16-23 * * *` — cada 30 min en ventana de partidos (16:00-06:00 UTC)
+  - `0 14 * * *` — catch-up diario para brackets/eliminatorias
+  - Auth via `SYNC_API_SECRET` para ejecucion desatendida
 
 ### Variables de entorno (backend/.env)
 ```

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-15
+- **chore(seasons):** cierre de temporada "Mundial 2026" (activa 2026-06-13, cerrada 2026-08-15 tras el torneo). Ganador: sergio.porcar con 212 puntos.
+- **chore(seasons):** creacion y activacion de nueva temporada "Temporada 2026/27" con clasificacion a cero, start date 2026-08-15. LaLiga 2026/27 comienza el 2026-08-16 (proximos partidos del Real Madrid y Barcelona se sincronizaran en la nueva temporada).
+- **chore(cron):** cron de sincronizacion del Mundial eliminado del crontab de root en el VPS (lineas `*/30 0-5,16-23 * * *` y `0 14 * * *`). El Mundial termino el 2026-07-19, asi que la sincronizacion automatica ya no es necesaria. Archivos retirados: script movido a `/root/betsoccer-sync-worldcup.sh.retired`, log comprimido `/var/log/betsoccer-wc-sync.log.gz`. El endpoint `POST /api/sync/worldcup` sigue disponible en el backend para lanzamiento manual si es necesario.
+
 ## 2026-08-12
 - **fix(auth):** el JWKS de Cloudflare ya no se cachea para siempre. Se descargaba una vez al arrancar el proceso y no se refrescaba nunca, así que en cuanto Cloudflare rotaba sus claves de firma el auto-login dejaba de funcionar: pasabas el OTP y la app te pedía usuario y contraseña. Ahora la caché caduca a la hora y, ante un fallo de verificación, se reintenta una vez con las claves recién descargadas — de modo que una rotación se absorbe al instante. Arreglado desde el chat de infra por ser un defecto transversal a 9 apps; contexto en `spcapps-infra/docs/PATTERNS.md`.
 

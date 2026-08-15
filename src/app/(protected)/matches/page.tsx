@@ -98,13 +98,14 @@ export default function MatchesPage() {
     homeScoreHalftime: number,
     awayScoreHalftime: number
   ) => {
-    if (!selectedUserId) return;
+    // Guard: the API always saves for the authenticated user, so submitting while
+    // another player is selected would silently overwrite your own prediction.
+    if (!currentUserId || selectedUserId !== currentUserId) return;
 
     try {
       const data = await apiFetch<Prediction>('/api/predictions', {
         method: 'POST',
         body: JSON.stringify({
-          user_id: selectedUserId,
           match_id: matchId,
           home_score: homeScore,
           away_score: awayScore,
@@ -161,7 +162,7 @@ export default function MatchesPage() {
         {users.length > 1 && (
           <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
             <Users className="w-5 h-5 text-gray-400" />
-            <span className="text-sm text-gray-400">Editando pronosticos de:</span>
+            <span className="text-sm text-gray-400">Pronosticos de:</span>
             <div className="flex gap-2">
               {users.map((user) => (
                 <button
@@ -185,7 +186,8 @@ export default function MatchesPage() {
         {selectedUser && selectedUserId !== currentUserId && (
           <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
             <p className="text-sm text-yellow-400">
-              Estas editando los pronosticos de <strong>{selectedUser.display_name}</strong>
+              Estas viendo los pronosticos de <strong>{selectedUser.display_name}</strong> —
+              solo lectura. Para editar los tuyos, vuelve a tu nombre.
             </p>
           </div>
         )}
@@ -206,6 +208,7 @@ export default function MatchesPage() {
               match={match}
               prediction={predictions[match.id]}
               onSavePrediction={handleSavePrediction}
+              readOnly={selectedUserId !== currentUserId}
             />
           ))}
         </div>

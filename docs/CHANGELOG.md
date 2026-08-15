@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-15 (2)
+- **fix(predictions):** el selector de jugador de la pagina "Partidos" ya no permite editar los
+  pronosticos de otro. Antes la UI decia "Estas editando los pronosticos de X" y enviaba
+  `user_id` en el POST, pero el backend ignora ese campo y siempre guarda para el usuario
+  autenticado — asi que al "editar los de X" en realidad **sobrescribias los tuyos** sin
+  ningun aviso. Ahora al seleccionar a otro jugador la tarjeta pasa a solo lectura
+  (`readOnly` en `MatchCard`), el guardado esta bloqueado en cliente, y se distingue
+  "Sin pronostico" de un 0-0 real. Ver los del rival sigue funcionando, que era la intencion.
+- **chore(cron):** creado el cron de sincronizacion de LaLiga/Champions en el VPS
+  (`/usr/local/bin/betsoccer-sync.sh`, cada 30 min entre 10:00-23:00 UTC + catch-up a las 08:00),
+  que sustituye al del Mundial retirado hoy. Sin el, la app se quedaba sin ninguna
+  sincronizacion automatica justo cuando arranca LaLiga 2026/27.
+
 ## 2026-08-15
 - **chore(seasons):** cierre de temporada "Mundial 2026" (activa 2026-06-13, cerrada 2026-08-15 tras el torneo). Ganador: sergio.porcar con 212 puntos.
 - **chore(seasons):** creacion y activacion de nueva temporada "Temporada 2026/27" con clasificacion a cero, start date 2026-08-15. LaLiga 2026/27 comienza el 2026-08-16 (proximos partidos del Real Madrid y Barcelona se sincronizaran en la nueva temporada).

@@ -41,6 +41,8 @@ interface MatchCardProps {
   showResult?: boolean;
   winners?: WinnerInfo[];
   allPredictions?: PredictionDetail[];
+  /** Viewing someone else's prediction: show it, but never let it be edited. */
+  readOnly?: boolean;
 }
 
 export function MatchCard({
@@ -50,6 +52,7 @@ export function MatchCard({
   showResult = false,
   winners,
   allPredictions,
+  readOnly = false,
 }: MatchCardProps) {
   const [homeScore, setHomeScore] = useState(prediction?.home_score ?? 0);
   const [awayScore, setAwayScore] = useState(prediction?.away_score ?? 0);
@@ -71,6 +74,8 @@ export function MatchCard({
   const isLocked = isPredictionLocked(match.kickoff_utc);
   const isFinished = match.status === 'FINISHED';
   const isLive = match.status === 'LIVE';
+  // Editable only when the match is still open AND this is your own prediction.
+  const editable = !isLocked && !readOnly;
 
   const checkChanges = (newHomeScore: number, newAwayScore: number, newHomeHT: number, newAwayHT: number) => {
     return (
@@ -82,7 +87,7 @@ export function MatchCard({
   };
 
   const handleScoreChange = (type: 'full' | 'half', team: 'home' | 'away', delta: number) => {
-    if (isLocked) return;
+    if (!editable) return;
 
     if (type === 'full') {
       if (team === 'home') {
@@ -108,7 +113,7 @@ export function MatchCard({
   };
 
   const handleSave = async () => {
-    if (isLocked || !hasChanges) return;
+    if (!editable || !hasChanges) return;
     setSaving(true);
     try {
       await onSavePrediction(match.id, homeScore, awayScore, homeScoreHT, awayScoreHT);
@@ -211,14 +216,14 @@ export function MatchCard({
               <ScoreInput
                 value={homeScore}
                 onChange={(delta) => handleScoreChange('full', 'home', delta)}
-                locked={isLocked}
+                locked={!editable}
                 color="indigo"
               />
               <span className="text-gray-500 font-bold">-</span>
               <ScoreInput
                 value={awayScore}
                 onChange={(delta) => handleScoreChange('full', 'away', delta)}
-                locked={isLocked}
+                locked={!editable}
                 color="indigo"
               />
             </div>
@@ -231,7 +236,7 @@ export function MatchCard({
               <ScoreInput
                 value={homeScoreHT}
                 onChange={(delta) => handleScoreChange('half', 'home', delta)}
-                locked={isLocked}
+                locked={!editable}
                 color="purple"
                 small
               />
@@ -239,7 +244,7 @@ export function MatchCard({
               <ScoreInput
                 value={awayScoreHT}
                 onChange={(delta) => handleScoreChange('half', 'away', delta)}
-                locked={isLocked}
+                locked={!editable}
                 color="purple"
                 small
               />
@@ -270,7 +275,7 @@ export function MatchCard({
       </div>
 
       {/* Save button */}
-      {!isLocked && hasChanges && (
+      {editable && hasChanges && (
         <button
           onClick={handleSave}
           disabled={saving}
@@ -288,10 +293,17 @@ export function MatchCard({
       )}
 
       {/* Prediction saved indicator */}
-      {!isLocked && prediction && !hasChanges && (
+      {editable && prediction && !hasChanges && (
         <p className="text-center text-xs text-green-400 mt-3 flex items-center justify-center gap-1">
           <Check className="w-3 h-3" />
           Pronóstico guardado
+        </p>
+      )}
+
+      {/* Without this, an empty prediction renders as 0-0 and looks like a real forecast */}
+      {readOnly && !prediction && (
+        <p className="text-center text-xs text-gray-500 mt-3">
+          Sin pronóstico
         </p>
       )}
 

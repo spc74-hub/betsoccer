@@ -61,7 +61,8 @@ betsoccer-migration/
 - Introducir pronostico de marcador: primer tiempo (HT) y resultado final (FT)
 - Editar pronostico hasta que comience el partido (lockout automatico)
 - Filtro por equipo (Todos / Real Madrid / Barcelona)
-- Selector de usuario para ver/editar pronosticos de otros jugadores
+- Selector de usuario para **ver** los pronosticos de otros jugadores (solo lectura: cada
+  jugador solo puede editar los suyos)
 
 ### Jornada
 - Vista comparativa side-by-side de todos los jugadores
@@ -237,6 +238,20 @@ betsoccer-migration/
   Canónico: `spcapps-infra/docs/DEPLOY-MODEL.md`.
 - **Base de datos:** `betsoccer` en PostgreSQL 16 compartido (user: `spcadmin`)
 - **Seed inicial:** `python seed.py` crea admin + primera temporada
+
+### Cron de sincronizacion (LaLiga / Champions) — ACTIVO
+
+Sincronizacion automatica de partidos, resultados y puntos mediante cron en el VPS (no en el repo):
+
+- **Script:** `/usr/local/bin/betsoccer-sync.sh` — lee `SYNC_API_SECRET` del `.env` y llama a
+  `POST /api/sync`. Fuera de `/opt/betsoccer` para sobrevivir al `git clean` del auto-deploy
+- **Crontab (root, UTC):**
+  - `*/30 10-23 * * *` — cada 30 min en la ventana de partidos (10:00-23:00 UTC ≈ 12:00-01:00 Madrid)
+  - `0 8 * * *` — catch-up diario para cambios de horario y aplazamientos
+- **Logs:** `/var/log/betsoccer-sync.log`
+- **Auth:** los endpoints de sync aceptan JWT o `SYNC_API_SECRET` (este ultimo para crons
+  desatendidos, via dependencia `require_sync_auth`, en la cabecera `Authorization: Bearer <secret>`)
+- **Lanzamiento manual:** `ssh root@72.62.26.203 /usr/local/bin/betsoccer-sync.sh`
 
 ### Cron de sincronizacion (Mundial 2026) — RETIRADO
 

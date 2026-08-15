@@ -14,6 +14,14 @@
 - [ ] **Configurar cron de sincronizacion automatica** — Configurar un cron job en el VPS que llame a POST /api/sync/worldcup periodicamente (cada 30 min en ventana 16:00–06:00 UTC durante Mundial, usando SYNC_API_SECRET).
 
 ## Prioridad Media
+- [ ] **Estadisticas de LaLiga: pichichi, zamora y otras** — Analisis de fuentes hecho el 2026-08-15 (verificado contra las APIs reales, no asumido):
+  - **Pichichi: GRATIS y ya disponible.** `GET /competitions/PD/scorers` de football-data.org (la fuente que ya usamos) devuelve goleadores con goles, asistencias, penaltis y partidos jugados. No requiere fuente nueva ni gasto.
+  - **Zamora: NO disponible gratis.** football-data.org no publica estadisticas de portero en ningun plan (solo goles en contra por equipo, en la clasificacion).
+  - **API-Football (api-sports.io):** el plan Free (100 req/dia) **NO da acceso a la temporada en curso**. Error literal de la API: `"Free plans do not have access to this season, try from 2022 to 2024."` Sirve para historico, no para 2026/27.
+  - Los datos del Zamora **si existen** en API-Football y son los correctos (verificado con Courtois 2024/25: 32 partidos, 2700 min, 29 encajados, 77 paradas), pero para la temporada en curso hacen falta **$19/mes del plan Pro**. Decidir si compensa para una liga de 2 jugadores.
+  - Descartados SofaScore y FotMob: sin API publica, habria que scrapear.
+- [ ] **Estadisticas de la liga de apuestas (BD propia)** — Rachas, mejor jornada, quien acierta mas los descansos, evolucion de puntos por jornada. Sale todo de las tablas `predictions`/`matches`, sin API externa ni coste. Pendiente de concretar que metricas interesan.
+
 
 - [ ] **Notificaciones de partidos proximos** — Avisar a los jugadores cuando un partido esta por empezar y no han hecho su pronostico.
 - [ ] **Registro de usuarios desde la app** — Actualmente los usuarios se crean solo via seed.py o directamente en DB. Permitir al admin crear jugadores desde la UI.

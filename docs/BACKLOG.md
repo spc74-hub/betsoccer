@@ -1,6 +1,8 @@
 # BetSoccer — Backlog
 
 ## Prioridad Alta
+- [ ] **Versionar los scripts de cron (pendiente de analisis en infra)** — `/usr/local/bin/betsoccer-sync.sh` vive solo en el VPS, fuera de git: si se reinstala el servidor desaparece y la clasificacion deja de actualizarse sin que nadie se entere. Contradice la regla de `COORDINACION.md` de que nada importante viva fuera de git. **No es especifico de betsoccer**: segun el analisis del 2026-08-15, ninguna app de la flota versiona sus crons. Propuesta a valorar en el chat de infra: guardarlos en `spcapps-infra/scripts/` con un instalador que los despliegue en el VPS. Aqui solo habria que cambiar la ruta del script cuando exista el estandar.
+
 - [x] 🔴 **Cron de sincronizacion de LaLiga 2026/27** — Al retirar el cron del Mundial el 2026-08-15 la app se quedo sin ninguna sincronizacion automatica justo antes del arranque de LaLiga. **✅ RESUELTO 2026-08-15:** creado `/usr/local/bin/betsoccer-sync.sh` (mismo patron que el del Mundial, con `SYNC_API_SECRET`) y programado `*/30 10-23 * * *` + catch-up `0 8 * * *`, log en `/var/log/betsoccer-sync.log`.
 
 - [x] 🔴 **Cada jugador podia sobrescribir sus propios pronosticos creyendo que editaba los de otro** — El selector de jugador de "Partidos" permitia pulsar sobre otro usuario y editar sus marcadores; la UI decia "Estas editando los pronosticos de X". Pero el backend (endurecido en `6a8436a`) ignora el `user_id` del cliente y guarda siempre para el usuario autenticado, asi que el resultado real era **machacar tu propio pronostico** sin aviso. **✅ RESUELTO 2026-08-15:** el selector pasa a solo lectura para jugadores distintos al actual (`readOnly` en `MatchCard`), se elimina el `user_id` del POST y se distingue "Sin pronostico" de un 0-0.

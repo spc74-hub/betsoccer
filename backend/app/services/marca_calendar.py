@@ -28,6 +28,7 @@ comprobarlas:
 import json
 import logging
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -50,6 +51,43 @@ _CREST = re.compile(
 )
 
 
+# Tokens que sobran al comparar nombres de club: la API dice "Burgos CF" y Marca
+# "Burgos", "AD Ceuta FC" vs "Ceuta", "Real Oviedo" vs "Oviedo".
+_RUIDO = {"fc", "cf", "ad", "cd", "sd", "ud", "club", "deportivo", "de", "real"}
+
+
+def _tokens(nombre: str) -> set[str]:
+    limpio = unicodedata.normalize("NFD", nombre)
+    limpio = "".join(c for c in limpio if unicodedata.category(c) != "Mn").lower()
+    return {t for t in re.split(r"[^a-z0-9]+", limpio) if t and t not in _RUIDO}
+
+
+def match_crest(nombre: str, escudos: dict[str, str]) -> Optional[str]:
+    """Busca el escudo de un equipo cuyo nombre viene de la API, no de Marca.
+
+    Los dos catalogos escriben distinto ("Sporting Gijon"/"Sporting",
+    "Celta Fortuna"/"Celta de Vigo B"), asi que se compara por tokens en tres
+    pasadas de menos a mas permisiva. Verificado el 2026-08-23: casa los 22
+    equipos de la categoria.
+    """
+    objetivo = _tokens(nombre)
+    if not objetivo:
+        return None
+    catalogo = {n: _tokens(n) for n in escudos}
+
+    for n, t in catalogo.items():          # 1) mismo conjunto de tokens
+        if t == objetivo:
+            return escudos[n]
+    for n, t in catalogo.items():          # 2) uno contiene al otro
+        if t <= objetivo or objetivo <= t:
+            return escudos[n]
+    for n, t in catalogo.items():          # 3) token compartido y unico en la liga
+        comun = t & objetivo
+        if comun and sum(1 for otro in catalogo.values() if otro & comun) == 1:
+            return escudos[n]
+    return None
+
+
 def _slug(dt: datetime, home: str, away: str) -> str:
     """Marca no da id de partido, asi que se compone uno estable."""
     limpio = re.sub(r"[^a-z0-9]+", "-", f"{home}-{away}".lower()).strip("-")
@@ -65,7 +103,7 @@ def _to_utc(marca_iso: str) -> Optional[datetime]:
     return naive.replace(tzinfo=MADRID).astimezone(timezone.utc)
 
 
-def _parse(html: str, now: datetime) -> list[dict]:
+def _parse(html: str, now: datetime) -> dict:
     eventos: list[dict] = []
     for bloque in _JSONLD.findall(html):
         try:
@@ -98,10 +136,12 @@ def _parse(html: str, now: datetime) -> list[dict]:
         )
 
     partidos.sort(key=lambda m: m["utc_time"])
-    return partidos
+    # Los escudos van aparte y completos: la clasificacion los necesita para los
+    # 22 equipos, no solo para los rivales del Castellon.
+    return {"matches": partidos, "crests": escudos}
 
 
-async def fetch_calendar(now: Optional[datetime] = None) -> Optional[list[dict]]:
+async def fetch_calendar(now: Optional[datetime] = None) -> Optional[dict]:
     """Baja y parsea el calendario. Devuelve None si algo falla.
 
     Nunca lanza: si Marca cambia el HTML o no responde, el que llama sigue con el
@@ -124,9 +164,12 @@ async def fetch_calendar(now: Optional[datetime] = None) -> Optional[list[dict]]
         logger.warning("marca: no se pudo descargar el calendario: %s", e)
         return None
 
-    partidos = _parse(html, now)
-    if not partidos:
+    datos = _parse(html, now)
+    if not datos["matches"]:
         logger.warning("marca: el calendario se descargo pero no se reconocio ningun partido")
         return None
-    logger.info("marca: calendario con %d partidos del %s", len(partidos), TEAM_NAME)
-    return partidos
+    logger.info(
+        "marca: calendario con %d partidos del %s y %d escudos",
+        len(datos["matches"]), TEAM_NAME, len(datos["crests"]),
+    )
+    return datos

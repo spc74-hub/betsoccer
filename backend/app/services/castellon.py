@@ -297,7 +297,7 @@ CALENDAR_TTL_DAYS = 7
 RESULT_CHASE_DAYS = 10
 
 
-async def get_calendar(db: AsyncSession, force: bool = False) -> Optional[list[dict]]:
+async def get_calendar(db: AsyncSession, force: bool = False) -> Optional[dict]:
     """Calendario de la temporada. No gasta cuota de la API: sale de Marca.
 
     Se refresca cada semana, no una sola vez: los horarios que LaLiga aun no ha
@@ -305,16 +305,23 @@ async def get_calendar(db: AsyncSession, force: bool = False) -> Optional[list[d
     concretando con unas 3 semanas de antelacion.
     """
     row = await db.get(ApiCache, _CALENDAR_KEY)
-    caducado = row is None or _now() - row.fetched_at >= timedelta(days=CALENDAR_TTL_DAYS)
+    guardado = (row.payload or {}) if row else {}
+    caducado = (
+        row is None
+        or _now() - row.fetched_at >= timedelta(days=CALENDAR_TTL_DAYS)
+        # Cache escrita antes de que existieran los escudos: se rebaja sola en vez
+        # de esperar una semana a tenerlos (bajarla no cuesta cuota de la API).
+        or "crests" not in guardado
+    )
 
     if force or caducado:
         fresco = await marca_calendar.fetch_calendar(_now())
         if fresco:
-            await _cache_put(db, _CALENDAR_KEY, {"matches": fresco})
+            await _cache_put(db, _CALENDAR_KEY, fresco)
             return fresco
         logger.warning("castellon: calendario no disponible, se usa el cacheado si lo hay")
 
-    return (row.payload or {}).get("matches") if row else None
+    return guardado or None
 
 
 def _day_key(iso: str) -> str:
@@ -329,7 +336,8 @@ async def get_matches(db: AsyncSession, force: bool = False) -> dict:
     llamada por jornada en vez de escanear 28 fechas a ciegas.
     """
     now = _now()
-    calendario = await get_calendar(db, force=force)
+    payload = await get_calendar(db, force=force)
+    calendario = (payload or {}).get("matches") or []
     if not calendario:
         return await _legacy_scan(db, force)
 
@@ -401,7 +409,10 @@ async def _standings_stale(db: AsyncSession, fetched_at: datetime) -> bool:
 async def get_standings(db: AsyncSession, force: bool = False) -> dict:
     cached = await _cache_get(db, _STANDINGS_KEY)
     row = await db.get(ApiCache, _STANDINGS_KEY)
-    stale = row is None or await _standings_stale(db, row.fetched_at)
+    # Tabla guardada antes de que existieran los escudos: se rehace sola en vez de
+    # esperar a la siguiente jornada, o el usuario no los veria hasta entonces.
+    sin_escudos = bool((cached or {}).get("table")) and "crest" not in cached["table"][0]
+    stale = row is None or sin_escudos or await _standings_stale(db, row.fetched_at)
 
     if force or stale:
         data = await _rapid_get(
@@ -409,6 +420,9 @@ async def get_standings(db: AsyncSession, force: bool = False) -> dict:
         )
         if data is not None:
             table = (data.get("response") or {}).get("standing") or []
+            # Los escudos salen del calendario ya cacheado: la API no los da y
+            # bajarlos aparte no costaria cuota, pero tampoco hace falta.
+            escudos = (await _cache_get(db, _CALENDAR_KEY) or {}).get("crests") or {}
             cached = {
                 "updated_at": _now().isoformat(),
                 "table": [
@@ -423,6 +437,7 @@ async def get_standings(db: AsyncSession, force: bool = False) -> dict:
                         "goals": t.get("scoresStr"),
                         "points": t.get("pts"),
                         "zone": t.get("qualColor"),
+                        "crest": marca_calendar.match_crest(t.get("name") or "", escudos),
                         "is_castellon": t.get("id") == settings.CASTELLON_TEAM_ID,
                     }
                     for t in table

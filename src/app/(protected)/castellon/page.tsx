@@ -43,6 +43,7 @@ interface TeamRow {
   lost: number;
   goals: string;
   points: number;
+  crest?: string | null;
   is_castellon: boolean;
 }
 
@@ -293,7 +294,12 @@ export default function CastellonPage() {
                   )}
                 >
                   <td className="py-2 pr-2 text-gray-400">{t.position}</td>
-                  <td className="py-2 pr-2">{t.name}</td>
+                  <td className="py-2 pr-2">
+                    <span className="flex items-center gap-2">
+                      <Crest team={{ name: t.name, crest: t.crest }} />
+                      {t.name}
+                    </span>
+                  </td>
                   <td className="py-2 px-2 text-center">{t.played}</td>
                   <td className="py-2 px-2 text-center">{t.won}</td>
                   <td className="py-2 px-2 text-center">{t.draw}</td>

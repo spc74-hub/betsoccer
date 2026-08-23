@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-23 (3)
+- **feat(castellon):** la clasificacion muestra el escudo de cada uno de los 22 equipos, no solo el nombre. Salen del calendario de Marca que ya se descarga, asi que **no cuestan ninguna llamada adicional**. La API no publica escudos en su endpoint de clasificacion.
+- **feat(castellon):** emparejador de nombres de club entre las dos fuentes (`marca_calendar.match_crest`). Escriben distinto — "Sporting Gijon"/"Sporting", "Celta Fortuna"/"Celta de Vigo B", "AD Ceuta FC"/"Ceuta" — y se comparan por tokens en tres pasadas de menos a mas permisiva, ignorando acentos y sufijos de club. Verificado: casa **22 de 22**.
+- **fix(castellon):** las caches escritas antes de este cambio (calendario sin escudos, tabla sin la columna) se detectan y se rehacen solas, en vez de esperar a que caduquen dentro de una semana.
+
 ## 2026-08-23 (2)
 - **feat(castellon):** el calendario pasa a leerse de la pagina publica de Marca (`services/marca_calendar.py`) en vez de preguntarle a la API fecha por fecha. Una sola peticion, que **no gasta cuota de RapidAPI**, trae la **temporada completa** (42 partidos) con escudos de los 22 equipos. La API queda para lo que hace bien: resultados y clasificacion. Consumo estimado: de **~35 a ~10 llamadas/mes**, y el calendario pasa de 17 dias vista a la temporada entera.
 - **feat(castellon):** conociendo el calendario, la API solo se llama para partidos ya jugados sin marcador — una llamada por jornada en lugar de escanear 28 fechas a ciegas. La clasificacion solo se refresca **si se ha jugado algo** desde la ultima vez (antes, cada 84 h pasara lo que pasara); el TTL sube a 7 dias como red de seguridad.

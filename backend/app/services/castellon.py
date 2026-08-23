@@ -107,6 +107,26 @@ async def _spend(db: AsyncSession, n: int = 1) -> None:
     await _cache_put(db, _QUOTA_KEY, {"month": state["month"], "used": state["used"] + n})
 
 
+async def _sync_quota(db: AsyncSession, headers) -> None:
+    """Cuadra el contador con lo que dice RapidAPI en cada respuesta.
+
+    Contarlas por nuestra cuenta se desincroniza: la ventana de RapidAPI no es el
+    mes natural, se renueva a los 31 dias de la suscripcion. Con un contador
+    propio que se reinicia el dia 1, la app se creeria con cuota que no tiene y
+    empezaria a comerse 429 reales. La cabecera viene en cada respuesta y es
+    gratis, asi que manda ella; contar a mano queda solo de respaldo.
+    """
+    try:
+        limit = int(headers["X-RateLimit-Requests-Limit"])
+        remaining = int(headers["X-RateLimit-Requests-Remaining"])
+    except (KeyError, TypeError, ValueError):
+        await _spend(db)
+        return
+    await _cache_put(
+        db, _QUOTA_KEY, {"month": _month(), "used": max(0, limit - remaining), "limit": limit}
+    )
+
+
 async def _can_spend(db: AsyncSession) -> bool:
     state = await quota_state(db)
     return state["used"] < settings.RAPIDAPI_MONTHLY_BUDGET
@@ -131,7 +151,8 @@ async def _rapid_get(db: AsyncSession, path: str) -> Optional[dict]:
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             res = await client.get(f"{BASE}{path}", headers=headers)
-        await _spend(db)
+        # Antes de raise_for_status: un 4xx/5xx tambien consume cuota en RapidAPI.
+        await _sync_quota(db, res.headers)
         res.raise_for_status()
         return res.json()
     except Exception as e:  # noqa: BLE001 — cualquier fallo degrada a cache

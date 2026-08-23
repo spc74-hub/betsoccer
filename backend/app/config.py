@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     CASTELLON_LEAGUE_ID: int = 140       # LaLiga2; estable entre temporadas
     CASTELLON_SCAN_INTERVAL_HOURS: int = 84   # ~2 escaneos por semana
     CASTELLON_MAX_CALLS_PER_SCAN: int = 6
-    CASTELLON_STANDINGS_TTL_HOURS: int = 84
+    CASTELLON_STANDINGS_TTL_HOURS: int = 168  # red de seguridad; lo normal es refrescar tras cada jornada
 
     ADMIN_EMAIL: str = "admin@example.com"
     ADMIN_PASSWORD: str = "changeme"

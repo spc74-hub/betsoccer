@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models.models import ApiCache
+from app.services import marca_calendar
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -234,7 +235,13 @@ async def _should_scan(db: AsyncSession, force: bool) -> bool:
     return bool(scan.get("pending")) and elapsed >= timedelta(hours=3)
 
 
-async def get_matches(db: AsyncSession, force: bool = False) -> dict:
+async def _legacy_scan(db: AsyncSession, force: bool = False) -> dict:
+    """Metodo antiguo: escanear fechas a ciegas contra la API.
+
+    Queda como **respaldo** para cuando el calendario de Marca no se pueda leer.
+    Es correcto pero caro (~30 llamadas/mes de las 100) y solo alcanza 17 dias
+    vista, porque pregunta fecha a fecha sin saber cuales tienen partido.
+    """
     today = _now().date()
     now = _now()
     days = [today + timedelta(days=d) for d in range(-PAST_DAYS, FUTURE_DAYS + 1)]
@@ -274,19 +281,127 @@ async def get_matches(db: AsyncSession, force: bool = False) -> dict:
     return {
         "results": list(reversed(played)),  # el mas reciente primero
         "upcoming": upcoming,
+        "source": "api-scan",
+        "quota": await quota_state(db),
+    }
+
+
+# ---------- motor principal: calendario de Marca + resultados de la API ----------
+
+_CALENDAR_KEY = "castellon:calendar"
+CALENDAR_TTL_DAYS = 7
+
+# Cuanto se sigue intentando traer el resultado de un partido ya jugado. Pasado
+# ese plazo se muestra sin marcador en vez de reintentar para siempre (un partido
+# aplazado no aparecera nunca con resultado).
+RESULT_CHASE_DAYS = 10
+
+
+async def get_calendar(db: AsyncSession, force: bool = False) -> Optional[list[dict]]:
+    """Calendario de la temporada. No gasta cuota de la API: sale de Marca.
+
+    Se refresca cada semana, no una sola vez: los horarios que LaLiga aun no ha
+    confirmado vienen con un hueco por defecto (domingo 18:00) y se van
+    concretando con unas 3 semanas de antelacion.
+    """
+    row = await db.get(ApiCache, _CALENDAR_KEY)
+    caducado = row is None or _now() - row.fetched_at >= timedelta(days=CALENDAR_TTL_DAYS)
+
+    if force or caducado:
+        fresco = await marca_calendar.fetch_calendar(_now())
+        if fresco:
+            await _cache_put(db, _CALENDAR_KEY, {"matches": fresco})
+            return fresco
+        logger.warning("castellon: calendario no disponible, se usa el cacheado si lo hay")
+
+    return (row.payload or {}).get("matches") if row else None
+
+
+def _day_key(iso: str) -> str:
+    return f"castellon:day:{(_parse(iso) or _now()):%Y%m%d}"
+
+
+async def get_matches(db: AsyncSession, force: bool = False) -> dict:
+    """Proximos partidos y resultados.
+
+    El calendario manda: sabiendo que dias juega el Castellon, la API solo se
+    llama para los partidos ya jugados de los que aun no tenemos marcador — una
+    llamada por jornada en vez de escanear 28 fechas a ciegas.
+    """
+    now = _now()
+    calendario = await get_calendar(db, force=force)
+    if not calendario:
+        return await _legacy_scan(db, force)
+
+    jugados = [m for m in calendario if (_parse(m["utc_time"]) or now) < now]
+    futuros = [m for m in calendario if (_parse(m["utc_time"]) or now) >= now]
+
+    # Del mas reciente hacia atras: si el tope por escaneo corta, corta por lo mas viejo.
+    calls = 0
+    for m in reversed(jugados):
+        if calls >= settings.CASTELLON_MAX_CALLS_PER_SCAN:
+            break
+        kickoff = _parse(m["utc_time"])
+        if not kickoff or kickoff < now - timedelta(days=RESULT_CHASE_DAYS):
+            break  # demasiado viejo: se deja sin marcador y no se persigue mas
+        key = _day_key(m["utc_time"])
+        row = await db.get(ApiCache, key)
+        cached = row.payload if row else None
+        if cached and any(x["finished"] for x in cached.get("matches", [])):
+            continue  # ya tenemos el resultado
+        if row and not force and _now() - row.fetched_at < timedelta(hours=3):
+            continue  # se intento hace poco; no insistir cada visita a la pagina
+        fresh = await _fetch_day(db, kickoff.date())
+        if fresh is None:
+            break  # sin cuota o API caida: se sirve lo que haya
+        await _cache_put(db, key, fresh)
+        calls += 1
+
+    async def _con_resultado(m: dict) -> dict:
+        cached = await _cache_get(db, _day_key(m["utc_time"])) or {}
+        api = next(iter(cached.get("matches", [])), None)
+        return {
+            **m,
+            "home_score": api["home_score"] if api and api["finished"] else None,
+            "away_score": api["away_score"] if api and api["finished"] else None,
+            "finished": bool(api and api["finished"]),
+        }
+
+    resultados = [await _con_resultado(m) for m in reversed(jugados)]
+    proximos = [{**m, "home_score": None, "away_score": None, "finished": False} for m in futuros]
+
+    return {
+        "results": resultados,
+        "upcoming": proximos,
+        "source": "marca+api",
         "quota": await quota_state(db),
     }
 
 
 # ---------- clasificacion ----------
 
+async def _standings_stale(db: AsyncSession, fetched_at: datetime) -> bool:
+    """La clasificacion solo cambia cuando se juega.
+
+    Antes se refrescaba cada 84 h aunque no hubiera pasado nada. Ahora se mira el
+    calendario: si desde la ultima vez se ha disputado algun partido, toca
+    refrescar; si no, la tabla guardada sigue siendo valida por definicion. El TTL
+    largo queda de red de seguridad (jornadas de otros equipos, sanciones).
+    """
+    now = _now()
+    if now - fetched_at >= timedelta(hours=settings.CASTELLON_STANDINGS_TTL_HOURS):
+        return True
+    calendario = (await _cache_get(db, _CALENDAR_KEY) or {}).get("matches") or []
+    return any(
+        fetched_at < (_parse(m["utc_time"]) or now) + timedelta(hours=2) < now
+        for m in calendario
+    )
+
+
 async def get_standings(db: AsyncSession, force: bool = False) -> dict:
     cached = await _cache_get(db, _STANDINGS_KEY)
     row = await db.get(ApiCache, _STANDINGS_KEY)
-    stale = (
-        row is None
-        or _now() - row.fetched_at >= timedelta(hours=settings.CASTELLON_STANDINGS_TTL_HOURS)
-    )
+    stale = row is None or await _standings_stale(db, row.fetched_at)
 
     if force or stale:
         data = await _rapid_get(

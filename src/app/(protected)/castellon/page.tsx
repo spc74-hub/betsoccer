@@ -9,14 +9,23 @@ import { Loader2, Trophy, Calendar, RefreshCw, AlertTriangle } from 'lucide-reac
 // hay pronosticos ni puntos, es solo consulta. El backend la limita al usuario
 // administrador, asi que el resto del grupo ni ve el enlace ni puede llamarla.
 
+interface Team {
+  id?: number;
+  name: string;
+  crest?: string | null;
+}
+
 interface CastellonMatch {
-  id: number;
+  id: number | string;
   utc_time: string | null;
-  home: { id: number; name: string };
-  away: { id: number; name: string };
+  home: Team;
+  away: Team;
   home_score: number | null;
   away_score: number | null;
   finished: boolean;
+  // Horario que LaLiga aun no ha confirmado: Marca rellena esos huecos con
+  // domingo a las 18:00. Se avisa en vez de enseñarlo como firme.
+  provisional?: boolean;
 }
 
 interface Quota {
@@ -39,11 +48,26 @@ interface TeamRow {
 
 type ViewMode = 'matches' | 'standings';
 
-const CASTELLON_ID = 10279;
+// El calendario viene de Marca ("Castellón") y los resultados de la API
+// ("Castellon"): se compara sin acentos para que valgan las dos.
+function esCastellon(t: Team): boolean {
+  return (
+    t.id === 10279 ||
+    t.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().startsWith('castellon')
+  );
+}
 
-function formatKickoff(iso: string | null): string {
+function formatKickoff(iso: string | null, provisional?: boolean): string {
   if (!iso) return '';
-  return new Date(iso).toLocaleString('es-ES', {
+  const d = new Date(iso);
+  if (provisional) {
+    // Sin hora: mostrar un 18:00 de relleno como si fuera firme seria mentir.
+    return (
+      d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) +
+      ' · hora por confirmar'
+    );
+  }
+  return d.toLocaleString('es-ES', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -52,8 +76,14 @@ function formatKickoff(iso: string | null): string {
   });
 }
 
+function Crest({ team }: { team: Team }) {
+  if (!team.crest) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={team.crest} alt="" className="w-5 h-5 object-contain shrink-0" />;
+}
+
 function MatchRow({ match }: { match: CastellonMatch }) {
-  const local = match.home.id === CASTELLON_ID;
+  const local = esCastellon(match.home);
   const golesFavor = local ? match.home_score : match.away_score;
   const golesContra = local ? match.away_score : match.home_score;
   const resultado = !match.finished
@@ -77,13 +107,17 @@ function MatchRow({ match }: { match: CastellonMatch }) {
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
+          <Crest team={match.home} />
           <span className={cn('truncate', local && 'font-semibold')}>{match.home.name}</span>
           <span className="text-gray-500 shrink-0">
             {match.finished ? `${match.home_score} - ${match.away_score}` : 'vs'}
           </span>
+          <Crest team={match.away} />
           <span className={cn('truncate', !local && 'font-semibold')}>{match.away.name}</span>
         </div>
-        <p className="text-xs text-gray-400 mt-0.5">{formatKickoff(match.utc_time)}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {formatKickoff(match.utc_time, match.provisional)}
+        </p>
       </div>
     </div>
   );
@@ -97,6 +131,7 @@ export default function CastellonPage() {
   const [quota, setQuota] = useState<Quota | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [verTodos, setVerTodos] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -198,11 +233,23 @@ export default function CastellonPage() {
             {upcoming.length === 0 ? (
               <p className="text-gray-500 text-sm">No hay partidos programados en las proximas semanas.</p>
             ) : (
-              <div className="space-y-2">
-                {upcoming.map((m) => (
-                  <MatchRow key={m.id} match={m} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-2">
+                  {(verTodos ? upcoming : upcoming.slice(0, 6)).map((m) => (
+                    <MatchRow key={m.id} match={m} />
+                  ))}
+                </div>
+                {upcoming.length > 6 && (
+                  <button
+                    onClick={() => setVerTodos(!verTodos)}
+                    className="mt-3 text-sm text-indigo-400 hover:text-indigo-300"
+                  >
+                    {verTodos
+                      ? 'Ver solo los proximos'
+                      : `Ver toda la temporada (${upcoming.length} partidos)`}
+                  </button>
+                )}
+              </>
             )}
           </section>
 

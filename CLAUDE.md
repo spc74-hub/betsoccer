@@ -344,6 +344,7 @@ NEXT_PUBLIC_API_URL=https://betsoccer.spcapps.com
 | `backend/app/routers/predictions.py` | CRUD de pronosticos |
 | `backend/app/services/stats.py` | Logica de estadisticas de la liga (BD propia) |
 | `backend/app/services/castellon.py` | Cliente RapidAPI + cache + presupuesto de cuota del CD Castellon |
+| `backend/app/services/marca_calendar.py` | Calendario de la temporada leido de Marca (JSON-LD), sin gastar cuota |
 | `backend/app/routers/castellon.py` | Endpoints /api/castellon (solo admin) |
 | `src/app/(protected)/castellon/page.tsx` | Vista del CD Castellon |
 | `backend/app/routers/stats.py` | Endpoint GET /api/stats |
@@ -371,6 +372,7 @@ Resumen: mejorar seguridad (roles admin), notificaciones, y UX de predicciones. 
 - El tier gratuito de football-data.org NO permite /teams/{id}/matches (403); el sync de equipos usa endpoints de competicion (LaLiga PD + Champions CL) filtrando por id de equipo. Copa del Rey no disponible en gratuito
 - **Segunda Division NO esta en el plan gratuito de football-data.org** (403 restricted, verificado el 2026-08-23). El CD Castellon usa otra fuente, `services/castellon.py`. No reintroducir un `division=segunda` en `/api/laliga`: ya existio y era codigo muerto que habria fallado al primer clic
 - **La seccion del Castellon no toca las tablas de apuestas.** `matches.external_id` es el id de football-data.org; meter ahi ids de otra fuente colisionaria y contaminaria el calculo de puntos. Todo lo del Castellon es lectura sobre `api_cache`
+- **El calendario del Castellon NO sale de la API**, sale de Marca (`services/marca_calendar.py`), porque la API no tiene endpoint por equipo y preguntar fecha a fecha costaba ~30 llamadas/mes. Tres trampas verificadas que no hay que revertir: la pagina va en **iso-8859-15**; **Marca pone hora de Madrid con sufijo `Z`** (hay que convertir o todo sale 2 h tarde); y los horarios sin confirmar vienen como domingo 18:00, por eso se marcan provisionales y el calendario se refresca semanalmente en vez de una sola vez
 - **La cuota de RapidAPI es de 100 peticiones AL MES.** Antes de tocar `services/castellon.py`, entender su politica de cache: las fechas ya jugadas se congelan para siempre y las futuras solo se revalidan cuando el partido ya deberia haber terminado. Al agotarse el presupuesto se sirve dato viejo, nunca un error
 - CORS completamente abierto (`allow_origins=["*"]`)
 - Sin registro publico de usuarios

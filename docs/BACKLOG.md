@@ -1,6 +1,13 @@
 # BetSoccer — Backlog
 
 ## Prioridad Alta
+- [x] **Seccion personal del CD Castellon (Hypermotion)** — **✅ HECHO 2026-08-23.** Vista `/castellon` con proximos partidos, resultados y clasificacion, limitada a `require_admin` y aislada de las apuestas. Analisis de fuentes hecho **probando cada una contra su API real**, no asumiendo:
+  - **football-data.org (la que ya usamos):** Segunda (`SD`) devuelve **403 restricted** con nuestra key. El primer plan que incluiria mas competiciones es **Standard, 49 €/mes**. Descartado.
+  - **api-sports (dashboard directo), plan Free:** bloquea la temporada en curso (*"try from 2022 to 2024"*) **y** los parametros `next` y `last`. Descartado. Ya estaba documentado en este backlog desde el 2026-08-15 — leerlo antes habria ahorrado el registro.
+  - **TheSportsDB con la key publica:** los datos son correctos pero **truncados a 5 filas**; la key de pago son **9 $/mes**. Descartado por coste.
+  - **ESPN API publica y openfootball:** 403 y sin Segunda 2026-27 respectivamente. Descartados.
+  - **Elegida: "Free API Live Football Data" (RapidAPI, datos de FotMob), plan Basic gratuito.**
+
 - [ ] **Versionar los scripts de cron (pendiente de analisis en infra)** — `/usr/local/bin/betsoccer-sync.sh` vive solo en el VPS, fuera de git: si se reinstala el servidor desaparece y la clasificacion deja de actualizarse sin que nadie se entere. Contradice la regla de `COORDINACION.md` de que nada importante viva fuera de git. **No es especifico de betsoccer**: segun el analisis del 2026-08-15, ninguna app de la flota versiona sus crons. Propuesta a valorar en el chat de infra: guardarlos en `spcapps-infra/scripts/` con un instalador que los despliegue en el VPS. Aqui solo habria que cambiar la ruta del script cuando exista el estandar.
 
 - [x] 🔴 **Cron de sincronizacion de LaLiga 2026/27** — Al retirar el cron del Mundial el 2026-08-15 la app se quedo sin ninguna sincronizacion automatica justo antes del arranque de LaLiga. **✅ RESUELTO 2026-08-15:** creado `/usr/local/bin/betsoccer-sync.sh` (mismo patron que el del Mundial, con `SYNC_API_SECRET`) y programado `*/30 10-23 * * *` + catch-up `0 8 * * *`, log en `/var/log/betsoccer-sync.log`.
@@ -45,3 +52,10 @@
 - [x] **Sync manual no cubria el Mundial** — El boton de sincronizar en Jornada solo llamaba a /api/sync (liga), por lo que los partidos del Mundial acabados seguian mostrando estado LIVE. Arreglado el 2026-06-14: handleSync ahora llama a /api/sync Y /api/sync/worldcup con Promise.allSettled.
 - [ ] **Funcion calculatePoints del frontend es legacy** — `src/lib/utils.ts:calculatePoints` devuelve 1 o 0 (sistema antiguo). No se usa activamente pero puede causar confusion si alguien la llama. El calculo real esta en el backend (`services/points.py`).
 - [ ] **Cross-user predictions sin validacion de rol** — Cualquier usuario puede enviar predicciones para otro usuario pasando `user_id` en el body del POST. Deberia requerir rol admin.
+
+## Limitaciones conocidas — seccion Castellon
+- [ ] **La cuota de RapidAPI son 100 peticiones AL MES, no al dia** — El presupuesto interno esta en 85 (`RAPIDAPI_MONTHLY_BUDGET`) y al agotarse la app **sirve datos cacheados en vez de llamar**, nunca da error. Coste estimado en regimen normal: ~40/mes. Si se queda corto, el mismo proveedor publica otras APIs equivalentes (`free-football-api-data`, y una "cheaper version") a las que se migra cambiando solo `RAPIDAPI_HOST` y revisando nombres de endpoint.
+- [ ] **El calendario cuesta una llamada por fecha** — Esta API no tiene endpoint de "partidos de un equipo". Se escanea la ventana [-10, +17] dias congelando las fechas ya jugadas (no vuelven a pedirse nunca). Si algun dia aparece un endpoint por equipo, el coste baja a 1 llamada y se pueden relajar los intervalos de `config.py`.
+- [ ] **La clave de RapidAPI quedo expuesta en capturas de pantalla el 2026-08-23** — El usuario indico que no podia rotarla. Es de plan gratuito con tope mensual, asi que el peor caso es que un tercero agote la cuota del mes (no hay cargo posible). **Rotarla en cuanto sea posible** y actualizar `RAPIDAPI_KEY` en `projects/betsoccer/.env` del VPS.
+- [ ] **El id de liga de la temporada cambia cada año** — En 2026-27 la Hypermotion es `938653` en los partidos, pero `140` en la clasificacion. El codigo **no** hardcodea el id de temporada (filtra por id de equipo), asi que el cambio de agosto no deberia romper nada; aun asi, conviene comprobar la seccion al arrancar cada temporada.
+- [ ] **`is_admin` no es un sistema de roles** — Se calcula comparando el email con `ADMIN_EMAIL`, igual que `require_admin`. Sigue pendiente el item de roles de usuario de este mismo backlog; cuando se haga, `_user_out()` en `routers/auth.py` debe pasar a leer la columna real.

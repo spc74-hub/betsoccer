@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { removeToken } from '@/lib/api';
+import { apiFetch, removeToken } from '@/lib/api';
 import {
   Calendar,
   Trophy,
@@ -14,8 +14,9 @@ import {
   Users,
   Tv,
   BarChart3,
+  Shield,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -27,10 +28,26 @@ const navItems = [
   { href: '/history', label: 'Historial', icon: History },
 ];
 
+// Seccion personal, fuera de la competicion: solo la ve el administrador. Ocultar
+// el enlace es cosmetico — quien protege de verdad es require_admin en el backend.
+const adminNavItem = { href: '/castellon', label: 'Castellon', icon: Shield };
+
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Se consulta al backend en vez de leer localStorage: las sesiones abiertas
+  // antes de este cambio guardaron un usuario sin el flag y nunca verian el
+  // enlace hasta volver a entrar.
+  useEffect(() => {
+    apiFetch<{ is_admin?: boolean }>('/api/auth/me')
+      .then((me) => setIsAdmin(!!me.is_admin))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  const items = isAdmin ? [...navItems, adminNavItem] : navItems;
 
   const handleSignOut = () => {
     removeToken();
@@ -49,7 +66,7 @@ export function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            {items.map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
               return (
@@ -91,7 +108,7 @@ export function Navbar() {
       {isOpen && (
         <div className="md:hidden border-t border-gray-800">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {navItems.map((item) => {
+            {items.map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
               return (

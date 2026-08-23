@@ -38,6 +38,7 @@ La barra de navegacion aparece en todas las paginas protegidas:
 | **LaLiga** | TV | Partidos y clasificacion de toda LaLiga |
 | **Clasificacion** | Trofeo | Ranking de jugadores por puntos |
 | **Historial** | Reloj | Partidos finalizados con resultados y puntos |
+| **Castellon** | Escudo | Partidos y clasificacion del CD Castellon (solo administrador) |
 
 En movil, la navegacion se muestra como menu hamburguesa (icono de 3 lineas).
 
@@ -266,6 +267,26 @@ temporadas, no la seleccionada en el desplegable.
 - **Temporadas:** el listado completo, con el ganador y sus puntos.
 
 ---
+
+## CD Castellon (solo administrador)
+
+Seccion personal, **sin ninguna relacion con la liga de apuestas**: aqui no se pronostica
+nada ni se suman puntos, es solo para consultar como va el equipo. Solo aparece en el menu
+si entras con la cuenta de administrador; el resto de jugadores no la ven.
+
+Tiene dos pestanas:
+
+- **Partidos** — Proximos encuentros del Castellon con dia y hora, y ultimos resultados. Cada
+  partido lleva una franja de color a la izquierda: verde si gano, roja si perdio, gris si
+  empato y azul si aun no se ha jugado.
+- **Clasificacion** — Tabla completa de LaLiga Hypermotion con los 22 equipos. La fila del
+  Castellon aparece resaltada.
+
+**Sobre el boton "Refrescar":** los datos vienen de una API externa con un limite de 100
+consultas al mes, asi que la app se refresca sola cada pocos dias en lugar de a cada rato.
+Si acaba de terminar un partido y quieres el resultado ya, pulsa "Refrescar". Abajo del todo
+veras cuantas consultas se han gastado este mes. Si se agotan, la pagina sigue funcionando
+pero muestra los ultimos datos guardados en vez de dar error.
 
 ## Datos tecnicos para el usuario
 

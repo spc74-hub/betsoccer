@@ -29,6 +29,9 @@ class UserOut(BaseModel):
     display_name: str
     avatar_url: Optional[str] = None
     created_at: datetime
+    # No es una columna: se calcula comparando el email con ADMIN_EMAIL, igual
+    # que require_admin. La app no tiene tabla de roles.
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 

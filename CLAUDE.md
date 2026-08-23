@@ -108,6 +108,12 @@ betsoccer-migration/
 - Selector de temporada; records son historicos (todas las temporadas)
 - Graficas SVG inline
 
+### CD Castellon (solo administrador)
+- Vista `/castellon` con proximos partidos, ultimos resultados y clasificacion completa de LaLiga Hypermotion
+- **Solo la ve el usuario administrador** (`require_admin`); el resto del grupo ni ve el enlace ni puede llamar a los endpoints
+- **Sin relacion con las apuestas:** no hay pronosticos ni puntos, y no escribe en `matches`
+- Boton de refresco manual y contador de cuota de la API visible en la propia pagina
+
 ### Sistema de puntuacion (acumulativo, max 10 pts/partido)
 | Condicion | Puntos |
 |-----------|--------|
@@ -167,6 +173,18 @@ betsoccer-migration/
 | winner_name | String | nullable |
 | winner_points | Integer | nullable |
 
+### api_cache
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| key | String | PK. Ej: `castellon:day:20260906`, `castellon:standings`, `rapidapi:quota` |
+| payload | JSONB | Respuesta ya reducida a lo que pinta la vista |
+| fetched_at | DateTime(tz) | Base del calculo de caducidad |
+
+Cache de APIs externas **y** contador mensual de consumo. Vive en BD a proposito:
+en memoria se perderia en cada reinicio y en disco en cada deploy (el contenedor
+se recrea al hacer pull de GHCR), y la cuota de RapidAPI es de 100 peticiones
+**al mes**, asi que perder la cache es perder cuota real.
+
 ## API endpoints
 
 ### Auth (`/api/auth`)
@@ -211,7 +229,14 @@ betsoccer-migration/
 ### LaLiga (`/api/laliga`)
 | Metodo | Ruta | Auth | Descripcion |
 |--------|------|------|-------------|
-| GET | `/api/laliga` | No | Proxy a football-data.org. Params: `type` (matches/standings) |
+| GET | `/api/laliga` | No | Proxy a football-data.org, **solo Primera**. Params: `type` (matches/standings) |
+
+### Castellon (`/api/castellon`) — solo admin
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| GET | `/api/castellon/matches` | Admin | Proximos partidos y ultimos resultados del CD Castellon |
+| GET | `/api/castellon/standings` | Admin | Clasificacion completa de LaLiga Hypermotion (22 equipos) |
+| POST | `/api/castellon/refresh` | Admin | Fuerza refresco saltando el intervalo (respeta el presupuesto mensual) |
 
 ### Stats (`/api/stats`)
 | Metodo | Ruta | Auth | Descripcion |
@@ -252,6 +277,13 @@ betsoccer-migration/
   Canónico: `spcapps-infra/docs/DEPLOY-MODEL.md`.
 - **Base de datos:** `betsoccer` en PostgreSQL 16 compartido (user: `spcadmin`)
 - **Seed inicial:** `python seed.py` crea admin + primera temporada
+- **Variables de entorno:** el compose usa `env_file: .env`, asi que basta anadirlas en
+  `/opt/spcapps-infra/projects/betsoccer/.env` del VPS (no hay que tocar el repo de infra).
+  Ademas de las existentes: **`RAPIDAPI_KEY`** para la seccion del Castellon — sin ella la
+  vista carga vacia pero no rompe nada. Opcionales para ajustar el gasto de cuota:
+  `RAPIDAPI_MONTHLY_BUDGET` (85), `CASTELLON_SCAN_INTERVAL_HOURS` (84),
+  `CASTELLON_MAX_CALLS_PER_SCAN` (6), `CASTELLON_STANDINGS_TTL_HOURS` (84)
+- **Tabla nueva:** `api_cache` se crea sola al arrancar (`init_db` hace `create_all`), sin migracion
 
 ### Cron de sincronizacion (LaLiga / Champions) — ACTIVO
 
@@ -311,6 +343,9 @@ NEXT_PUBLIC_API_URL=https://betsoccer.spcapps.com
 | `backend/app/routers/sync.py` | Sincronizacion de partidos y calculo de puntos |
 | `backend/app/routers/predictions.py` | CRUD de pronosticos |
 | `backend/app/services/stats.py` | Logica de estadisticas de la liga (BD propia) |
+| `backend/app/services/castellon.py` | Cliente RapidAPI + cache + presupuesto de cuota del CD Castellon |
+| `backend/app/routers/castellon.py` | Endpoints /api/castellon (solo admin) |
+| `src/app/(protected)/castellon/page.tsx` | Vista del CD Castellon |
 | `backend/app/routers/stats.py` | Endpoint GET /api/stats |
 | `src/components/MatchCard.tsx` | Componente principal de pronostico |
 | `src/app/(protected)/jornada/page.tsx` | Vista comparativa de todos los jugadores |
@@ -334,6 +369,9 @@ Resumen: mejorar seguridad (roles admin), notificaciones, y UX de predicciones. 
 - Todos los tiempos se muestran en zona horaria `Europe/Madrid`
 - La API externa principal es football-data.org v4 (no api-football.com)
 - El tier gratuito de football-data.org NO permite /teams/{id}/matches (403); el sync de equipos usa endpoints de competicion (LaLiga PD + Champions CL) filtrando por id de equipo. Copa del Rey no disponible en gratuito
+- **Segunda Division NO esta en el plan gratuito de football-data.org** (403 restricted, verificado el 2026-08-23). El CD Castellon usa otra fuente, `services/castellon.py`. No reintroducir un `division=segunda` en `/api/laliga`: ya existio y era codigo muerto que habria fallado al primer clic
+- **La seccion del Castellon no toca las tablas de apuestas.** `matches.external_id` es el id de football-data.org; meter ahi ids de otra fuente colisionaria y contaminaria el calculo de puntos. Todo lo del Castellon es lectura sobre `api_cache`
+- **La cuota de RapidAPI es de 100 peticiones AL MES.** Antes de tocar `services/castellon.py`, entender su politica de cache: las fechas ya jugadas se congelan para siempre y las futuras solo se revalidan cuando el partido ya deberia haber terminado. Al agotarse el presupuesto se sirve dato viejo, nunca un error
 - CORS completamente abierto (`allow_origins=["*"]`)
 - Sin registro publico de usuarios
 - PWA habilitada con manifest.json

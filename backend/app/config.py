@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     FOOTBALL_DATA_KEY: str = ""
     SYNC_API_SECRET: str = ""
 
+    # --- CD Castellon (LaLiga Hypermotion). Solo lectura, fuera de las apuestas.
+    # El plan gratuito de RapidAPI son 100 peticiones AL MES: el presupuesto se
+    # queda por debajo para dejar margen a pruebas manuales.
+    RAPIDAPI_KEY: str = ""
+    RAPIDAPI_MONTHLY_BUDGET: int = 85
+    CASTELLON_TEAM_ID: int = 10279       # primer equipo (el filial es 1784556)
+    CASTELLON_LEAGUE_ID: int = 140       # LaLiga2; estable entre temporadas
+    CASTELLON_SCAN_INTERVAL_HOURS: int = 84   # ~2 escaneos por semana
+    CASTELLON_MAX_CALLS_PER_SCAN: int = 6
+    CASTELLON_STANDINGS_TTL_HOURS: int = 84
+
     ADMIN_EMAIL: str = "admin@example.com"
     ADMIN_PASSWORD: str = "changeme"
     ADMIN_DISPLAY_NAME: str = "Admin"

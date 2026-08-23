@@ -11,7 +11,6 @@ const TEAM_IDS = {
 // Competition IDs
 const COMPETITION_IDS = {
   LA_LIGA: 'PD',      // Primera División
-  SEGUNDA: 'SD',      // Segunda División
 };
 
 // Map football-data.org status to our status

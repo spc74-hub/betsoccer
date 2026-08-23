@@ -23,6 +23,15 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
+def _user_out(user: User) -> UserOut:
+    """UserOut con is_admin resuelto igual que require_admin."""
+    out = UserOut.model_validate(user)
+    out.is_admin = (
+        user.email.lower().strip() == get_settings().ADMIN_EMAIL.lower().strip()
+    )
+    return out
+
 _cf_settings = get_settings()
 # ⚠️ Cloudflare ROTA estas claves. Cachearlas para siempre significa que, el día
 # que rota, la verificación falla y el auto-login deja de funcionar sin que nadie
@@ -88,7 +97,7 @@ async def cf_access_login(request: Request, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=403, detail="No betsoccer account for this identity")
     token = create_access_token(str(user.id), user.email)
-    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
+    return TokenResponse(access_token=token, user=_user_out(user))
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -99,12 +108,12 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Email o contrasena incorrectos")
 
     token = create_access_token(str(user.id), user.email)
-    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
+    return TokenResponse(access_token=token, user=_user_out(user))
 
 
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
-    return UserOut.model_validate(user)
+    return _user_out(user)
 
 
 @router.post("/change-password")

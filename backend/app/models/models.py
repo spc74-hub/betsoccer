@@ -12,7 +12,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -114,3 +114,19 @@ class Season(Base):
     winner_name = Column(String, nullable=True)
     winner_points = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class ApiCache(Base):
+    """Cache de respuestas de APIs externas, en BD a proposito.
+
+    En memoria se perderia en cada reinicio y en disco en cada deploy (el
+    contenedor se recrea al hacer pull de la imagen de GHCR). Con una cuota de
+    100 peticiones AL MES en RapidAPI, perder la cache es perder cuota real.
+    Guarda tambien el contador mensual de consumo bajo la clave rapidapi:quota.
+    """
+
+    __tablename__ = "api_cache"
+
+    key = Column(String, primary_key=True)
+    payload = Column(JSONB, nullable=False)
+    fetched_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)

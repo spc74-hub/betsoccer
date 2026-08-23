@@ -10,11 +10,13 @@ router = APIRouter(prefix="/api/laliga", tags=["laliga"])
 
 
 @router.get("")
-async def get_laliga(
-    division: str = Query("primera"),
-    type: str = Query("matches"),
-):
-    comp_id = COMPETITION_IDS["SEGUNDA"] if division == "segunda" else COMPETITION_IDS["LA_LIGA"]
+async def get_laliga(type: str = Query("matches")):
+    # Solo Primera. La Segunda (codigo SD) NO esta en el plan gratuito de
+    # football-data.org: devuelve 403 "resource restricted". Existia aqui un
+    # parametro division=segunda que el frontend nunca llamaba y que habria
+    # reventado al primer clic. Para el Castellon se usa /api/castellon, que
+    # tira de otra fuente. Verificado el 2026-08-23.
+    comp_id = COMPETITION_IDS["LA_LIGA"]
 
     if type == "standings":
         standings = await fetch_competition_standings(comp_id)

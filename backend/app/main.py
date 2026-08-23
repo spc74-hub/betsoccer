@@ -4,7 +4,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import admin, auth, laliga, matches, predictions, standings, stats, sync, users
+from app.routers import (
+    admin,
+    auth,
+    castellon,
+    laliga,
+    matches,
+    predictions,
+    standings,
+    stats,
+    sync,
+    users,
+)
 
 
 @asynccontextmanager
@@ -32,6 +43,7 @@ app.include_router(stats.router)
 app.include_router(sync.router)
 app.include_router(laliga.router)
 app.include_router(admin.router)
+app.include_router(castellon.router)
 
 
 @app.get("/health")

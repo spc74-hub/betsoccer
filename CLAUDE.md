@@ -115,11 +115,13 @@ betsoccer-migration/
 - Boton de refresco manual y contador de cuota de la API visible en la propia pagina
 
 ### Sistema de puntuacion (acumulativo, max 10 pts/partido)
+
+⚠️ **El reparto entre descanso y diferencia cambio el 2026-08-25** (descanso +3, diferencia +2; antes era al reves). Los partidos anteriores conservan la puntuacion que obtuvieron: `services/points.py` elige las reglas segun `kickoff_utc` del partido, **no** con constantes globales. Ver la convencion mas abajo antes de tocarlo.
 | Condicion | Puntos |
 |-----------|--------|
 | Acertar ganador (1X2) | +1 |
-| Acertar marcador del primer tiempo | +2 |
-| Acertar diferencia de goles | +3 |
+| Acertar marcador del primer tiempo | +3 |
+| Acertar diferencia de goles | +2 |
 | Acertar resultado exacto | +4 |
 
 ## Database schema
@@ -363,6 +365,7 @@ Resumen: mejorar seguridad (roles admin), notificaciones, y UX de predicciones. 
 
 ## Conventions
 
+- 🔴 **Las reglas de puntuacion dependen de la FECHA del partido, no son constantes globales** (`services/points.py`, `SCORING_V2_FROM`). El 2026-08-25 se intercambiaron los puntos de descanso (+2 -> +3) y diferencia (+3 -> +2). Como `POST /api/admin/recalculate-points` recalcula **todo** el historico desde cero, unas constantes globales harian que la primera pulsacion reescribiera puntos ya obtenidos y clasificaciones de temporadas cerradas. Al depender del `kickoff_utc`, recalcular es idempotente. Si algun dia se cambia otra vez el reparto, **añadir otra frontera, no editar las existentes**
 - **Idioma:** commits en ingles, UI y documentacion en espanol
 - **When making changes, update this CLAUDE.md**
 - Al completar items del backlog, marcarlos en `docs/BACKLOG.md` y documentar en `docs/CHANGELOG.md`

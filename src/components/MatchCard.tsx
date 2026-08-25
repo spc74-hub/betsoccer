@@ -253,7 +253,7 @@ export function MatchCard({
 
           {/* Points breakdown */}
           {isFinished && prediction && (
-            <PointsBreakdown prediction={prediction} />
+            <PointsBreakdown prediction={prediction} kickoff={match.kickoff_utc} />
           )}
         </div>
 
@@ -454,11 +454,21 @@ function ScoreInput({
 }
 
 // Points breakdown component
-function PointsBreakdown({ prediction }: { prediction: Prediction }) {
+function PointsBreakdown({
+  prediction,
+  kickoff,
+}: {
+  prediction: Prediction;
+  kickoff?: string;
+}) {
+  // El reparto cambio el 25/08/2026: el descanso paso a valer 3 y la diferencia
+  // 2. Los partidos anteriores conservan su puntuacion, asi que el maximo de cada
+  // barra depende de cuando se jugo. Debe cuadrar con SCORING_V2_FROM del backend.
+  const nuevas = !kickoff || new Date(kickoff) >= new Date('2026-08-25T00:00:00Z');
   const points = [
     { label: 'Ganador', value: prediction.points_winner, max: 1 },
-    { label: 'Descanso', value: prediction.points_halftime, max: 2 },
-    { label: 'Diferencia', value: prediction.points_difference, max: 3 },
+    { label: 'Descanso', value: prediction.points_halftime, max: nuevas ? 3 : 2 },
+    { label: 'Diferencia', value: prediction.points_difference, max: nuevas ? 2 : 3 },
     { label: 'Exacto', value: prediction.points_exact, max: 4 },
   ];
 

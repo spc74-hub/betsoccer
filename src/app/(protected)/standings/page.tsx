@@ -161,14 +161,14 @@ export default function StandingsPage() {
                   <span className="text-white font-medium">Resultado al descanso</span>
                   <p className="text-xs text-gray-500">Acertar el marcador del primer tiempo</p>
                 </div>
-                <span className="text-green-400 font-bold">+2 puntos</span>
+                <span className="text-green-400 font-bold">+3 puntos</span>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg">
                 <div>
                   <span className="text-white font-medium">Diferencia de goles</span>
                   <p className="text-xs text-gray-500">Acertar la diferencia (ej: +1, -2, 0)</p>
                 </div>
-                <span className="text-green-400 font-bold">+3 puntos</span>
+                <span className="text-green-400 font-bold">+2 puntos</span>
               </div>
               <div className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded-lg">
                 <div>
@@ -178,11 +178,19 @@ export default function StandingsPage() {
                 <span className="text-green-400 font-bold">+4 puntos</span>
               </div>
             </div>
+            <div className="mt-3 p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
+              <p className="text-sm text-amber-300">
+                <strong>Cambio de reglas:</strong> desde el partido del 26/08/2026 el
+                descanso vale <strong>+3</strong> y la diferencia <strong>+2</strong> (antes
+                era al reves). Los partidos anteriores mantienen la puntuacion que
+                obtuvieron: el maximo por partido sigue siendo 10.
+              </p>
+            </div>
             <div className="mt-3 p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/30">
               <p className="text-sm text-indigo-300">
                 <strong>Ejemplo:</strong> Si predices 2-1 y el resultado es 2-1:
                 <br />
-                Ganador (+1) + Diferencia (+3) + Exacto (+4) = <strong>8 puntos</strong>
+                Ganador (+1) + Diferencia (+2) + Exacto (+4) = <strong>7 puntos</strong>
                 <br />
                 Si ademas aciertas el descanso: <strong>10 puntos</strong>
               </p>

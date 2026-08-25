@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-24
+- **feat(points):** intercambiados los puntos de **acertar el descanso (+2 -> +3)** y **acertar la diferencia de goles (+3 -> +2)**. El maximo por partido sigue siendo 10. Aplica **desde el partido del 26/08/2026** (Real Madrid - Real Sociedad); todo lo jugado antes conserva su puntuacion.
+- **feat(points):** el reparto deja de ser una constante global y pasa a elegirse por la **fecha del partido** (`SCORING_V2_FROM` en `services/points.py`). Es lo que hace posible cambiar las reglas sin reescribir la historia: `POST /api/admin/recalculate-points` recalcula todas las predicciones de todos los partidos terminados desde cero, asi que con constantes globales la primera pulsacion habria cambiado puntos ya obtenidos y clasificaciones de temporadas cerradas. **Verificado con un simulacro contra la BD de produccion: 273 predicciones, 0 cambios.**
+- **feat(ui):** el panel de reglas de Clasificacion muestra el nuevo reparto y un aviso del cambio; el desglose por barras de `MatchCard` usa el maximo que corresponda a la fecha de cada partido (un +2 al descanso en un partido viejo no debe pintarse como si le faltara un punto).
+
 ## 2026-08-23 (3)
 - **feat(castellon):** la clasificacion muestra el escudo de cada uno de los 22 equipos, no solo el nombre. Salen del calendario de Marca que ya se descarga, asi que **no cuestan ninguna llamada adicional**. La API no publica escudos en su endpoint de clasificacion.
 - **feat(castellon):** emparejador de nombres de club entre las dos fuentes (`marca_calendar.match_crest`). Escriben distinto — "Sporting Gijon"/"Sporting", "Celta Fortuna"/"Celta de Vigo B", "AD Ceuta FC"/"Ceuta" — y se comparan por tokens en tres pasadas de menos a mas permisiva, ignorando acentos y sufijos de club. Verificado: casa **22 de 22**.

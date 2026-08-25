@@ -151,8 +151,10 @@ Tres tarjetas en la parte superior:
 
 Boton "Como se calculan los puntos?" que muestra:
 - +1 punto: acertar el ganador (local, empate, visitante)
-- +2 puntos: acertar el marcador del primer tiempo
-- +3 puntos: acertar la diferencia de goles
+- +3 puntos: acertar el marcador del primer tiempo (descanso)
+- +2 puntos: acertar la diferencia de goles
+
+> **Cambio de reglas (26/08/2026):** el descanso pasa a valer 3 puntos y la diferencia 2; antes era al reves. Se aplica **a partir del partido Real Madrid - Real Sociedad del 26/08**. Todo lo jugado antes conserva los puntos que ya diste por bueno, y el maximo por partido sigue siendo 10.
 - +4 puntos: acertar el resultado exacto
 - **Maximo 10 puntos por partido** (todos los criterios son acumulativos)
 
@@ -179,7 +181,7 @@ Muestra tus resultados en partidos ya finalizados.
 
 - **Lista de partidos finalizados** (hasta 50, los mas recientes primero).
   - Cada tarjeta muestra: resultado real del partido, tu pronostico, y los puntos obtenidos.
-  - **Desglose de puntos:** badges de color por cada categoria acertada (Ganador +1, HT +2, Diferencia +3, Exacto +4).
+  - **Desglose de puntos:** badges de color por cada categoria acertada (Ganador +1, HT +3, Diferencia +2, Exacto +4; en partidos anteriores al 26/08/2026, HT +2 y Diferencia +3).
 
 ### Predicciones de todos los jugadores
 

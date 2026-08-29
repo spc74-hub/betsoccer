@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-08-29
+- **fix(pwa):** el icono no aparecia al añadir la app a la pantalla de inicio. El unico `apple-touch-icon` declarado era `/icon.svg`, y **iOS no acepta SVG** para el icono de inicio: solo PNG, y en 180x180 (iPhone), 167x167 (iPad Pro) o 152x152 (iPad retina). Rasterizados los tres tamaños desde el SVG + fallback `/apple-touch-icon.png` en la raiz.
+
 ## 2026-08-24
 - **feat(points):** intercambiados los puntos de **acertar el descanso (+2 -> +3)** y **acertar la diferencia de goles (+3 -> +2)**. El maximo por partido sigue siendo 10. Aplica **desde el partido del 26/08/2026** (Real Madrid - Real Sociedad); todo lo jugado antes conserva su puntuacion.
 - **feat(points):** el reparto deja de ser una constante global y pasa a elegirse por la **fecha del partido** (`SCORING_V2_FROM` en `services/points.py`). Es lo que hace posible cambiar las reglas sin reescribir la historia: `POST /api/admin/recalculate-points` recalcula todas las predicciones de todos los partidos terminados desde cero, asi que con constantes globales la primera pulsacion habria cambiado puntos ya obtenidos y clasificaciones de temporadas cerradas. **Verificado con un simulacro contra la BD de produccion: 273 predicciones, 0 cambios.**
